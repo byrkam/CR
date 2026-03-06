@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="dash-header">
+  <div>
+    <h2 class="page-title">{{ current_user.username }}'s Dashboard</h2>
+    <p class="dash-subtitle">{{ current_user.role|capitalize }} Control Panel</p>
+    <p class="dash-subtitle">Track your scenario progress and stay updated.</p>
+  </div>
+</div>
+
+<div class="dash-panels">
+
+    {% include "partials/news_widget.html" %}
+
+
+  <div class="panel">
+    <div class="panel-title">Recent Wi-Fi CVEs</div>
+
+    {% if cves and cves|length > 0 %}
+      <div class="ticker" aria-label="Wi-Fi CVEs ticker">
+        <ul class="ticker-track">
+          {% for cve in cves %}
+            <li class="ticker-item">
+              <a class="news-link" href="{{ cve.link }}" target="_blank" rel="noopener noreferrer">
+                <strong>{{ cve.id }}</strong> — {{ cve.description }}
+                {% if cve.published %}<span class="news-source">{{ cve.published[:10] }}</span>{% endif %}
+              </a>
+            </li>
+          {% endfor %}
+
+          {% for cve in cves %}
+            <li class="ticker-item">
+              <a class="news-link" href="{{ cve.link }}" target="_blank" rel="noopener noreferrer">
+                <strong>{{ cve.id }}</strong> — {{ cve.description }}
+                {% if cve.published %}<span class="news-source">{{ cve.published[:10] }}</span>{% endif %}
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <div class="small">Hover to pause.</div>
+    {% else %}
+      <p class="dash-subtitle">No Wi-Fi CVEs found.</p>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

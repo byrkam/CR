@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# Environment / secrets
+.env
+*.env
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+
+# Build / cache / temp
+dist/
+build/
+tmp/
+.cache/
+.pytest_cache/
+.mypy_cache/
+
+# Node-related, only if present
+node_modules/
+
+# Local databases, if you don't want them tracked
+*.sqlite3
+*.db

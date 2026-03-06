@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2 class="page-title">Your Profile</h2>
+
+{% if success %}
+  <div class="alert alert-success">{{ success }}</div>
+{% endif %}
+{% if error %}
+  <div class="alert alert-error">{{ error }}</div>
+{% endif %}
+
+<div class="profile-grid">
+
+  <!-- LEFT: account + profile edit -->
+  <section class="profile-card">
+    <h3 class="profile-section-title">Account</h3>
+
+    <div class="profile-kv">
+      <div class="k">Email</div>
+      <div class="v">{{ user.email }}</div>
+
+      <div class="k">Role</div>
+      <div class="v">{{ user.role }}</div>
+
+      <div class="k">Public ID</div>
+      <div class="v mono"><code>{{ user.public_id }}</code></div>
+    </div>
+
+    <hr class="profile-sep"/>
+
+    <h3 class="profile-section-title">Public Profile</h3>
+
+    <form method="POST" action="{{ url_for('profile_update') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <label class="field-label">Username (unique)</label>
+      <input class="field-input" name="username" value="{{ user.username }}" maxlength="20" required>
+
+      <div class="field-hint">3–20 chars, letters/numbers/underscore only.</div>
+
+      <label class="field-label" style="margin-top:12px;">Bio</label>
+      <textarea class="field-textarea" name="bio" maxlength="280" rows="4"
+        placeholder="Tell others what you're working on...">{{ user.bio or "" }}</textarea>
+
+      <button type="submit" class="primary-btn">Save Profile</button>
+    </form>
+  </section>
+
+  <!-- RIGHT: password change -->
+  <section class="profile-card">
+    <h3 class="profile-section-title">Change Password</h3>
+
+    <form method="POST" action="{{ url_for('profile_change_password') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <label class="field-label">Current password</label>
+      <input class="field-input" type="password" name="current_password" required>
+
+      <label class="field-label" style="margin-top:12px;">New password</label>
+      <input class="field-input" type="password" name="new_password" required>
+
+      <label class="field-label" style="margin-top:12px;">Confirm new password</label>
+      <input class="field-input" type="password" name="confirm_password" required>
+
+      <button type="submit" class="primary-btn">Update Password</button>
+
+      <div class="field-hint" style="margin-top:10px;">
+        Tip: use at least 8 chars, uppercase/lowercase, number, and special character.
+      </div>
+    </form>
+  </section>
+
+</div>
+
+{% endblock %}

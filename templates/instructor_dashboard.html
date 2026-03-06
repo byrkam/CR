@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="page-title">{{ current_user.username }}'s Dashboard</h2>
+<p class="dash-subtitle">{{ current_user.role|capitalize }} Control Panel</p>
+<p>Here you’ll create and manage Wi-Fi lab scenarios (coming soon).</p>
+{% endblock %}

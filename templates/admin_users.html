@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2 class="page-title">User Management</h2>
+
+{% if error %}
+  <div class="alert alert-error">
+    {{ error }}
+  </div>
+{% endif %}
+
+{% if temp_password and reset_email %}
+  <div class="alert alert-success">
+    <div>Password reset for <strong>{{ reset_email }}</strong>.</div>
+    <div class="mono">
+      Temporary password: <code>{{ temp_password }}</code>
+    </div>
+    <div class="small">
+      ⚠️ Show this password now — it won’t be shown again.
+    </div>
+  </div>
+{% endif %}
+
+<table class="admin-table">
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Email</th>
+      <th>Role</th>
+      <th>Reset Password</th>
+      <th>Remove User</th>
+      <th>Last login</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for u in users %}
+    <tr>
+      <td>{{ u.public_id[:8] }}</td>
+      <td>{{ u.email }}</td>
+      <td>{{ u.role }}</td>
+      <td>
+        <form method="POST"
+              action="{{ url_for('admin_reset_password', user_id=u.id) }}"
+              class="reset-form">
+
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+          <input class="reset-input"
+                 type="text"
+                 name="new_password"
+                 placeholder="Optional custom password">
+
+          <button class="reset-btn" type="submit">
+            Reset
+          </button>
+        </form>
+      </td>
+      <td>
+  	<form method="POST"
+        	action="{{ url_for('admin_delete_user', user_id=u.id) }}"
+        	onsubmit="return confirm('Are you sure you want to delete this user?');">
+
+    	  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    	  <button class="delete-btn" type="submit">🚪Remove</button>
+  	</form>
+       </td>
+       <td>
+  	 {% if u.last_login_at %}
+    	 {{ u.last_login_at.strftime('%Y-%m-%d %H:%M') }}
+  	 {% else %}
+    	 Never
+  	 {% endif %}
+       </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% endblock %}

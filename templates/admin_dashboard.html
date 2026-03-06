@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="dash-header">
+  <div>
+    <h2 class="page-title">{{ current_user.username }}'s Dashboard</h2>
+    <p class="dash-subtitle">{{ current_user.role|capitalize }} Control Panel</p>
+    <p class="dash-subtitle">Manage accounts, scenarios, and platform settings.</p>
+  </div>
+
+  <div class="dash-actions">
+    <a class="dash-btn" href="{{ url_for('admin_users') }}" title="Manage Users">👥</a>
+    <a class="dash-btn" href="{{ url_for('admin_scenarios') }}" title="Manage Scenarios">📚</a>
+    <a class="dash-btn" href="{{ url_for('admin_assets') }}" title="Manage Assets">📦</a>
+  </div>
+</div>
+
+
+<div class="dash-grid">
+  <div class="stat-card">
+    <div class="stat-label">Total users</div>
+    <div class="stat-value">{{ total_users }}</div>
+    <div class="stat-hint">All non-admin accounts</div>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-label">Instructors</div>
+    <div class="stat-value">{{ instructors }}</div>
+    <div class="stat-hint">Can create/manage labs</div>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-label">Learners</div>
+    <div class="stat-value">{{ learners }}</div>
+    <div class="stat-hint">Can access assigned labs</div>
+  </div>
+</div>
+
+
+<div class="dash-panels">
+
+  <!-- Wi-Fi Security News -->
+  <div class="panel">
+
+    <div class="panel-title">Wi-Fi Security News</div>
+
+    {% if news and news|length > 0 %}
+      <div class="ticker" aria-label="Wi-Fi security news ticker">
+
+        <ul class="ticker-track">
+
+          {% for item in news %}
+          <li class="ticker-item">
+            <a href="{{ item.link }}"
+               target="_blank"
+               rel="noopener noreferrer"
+               class="news-link">
+
+              {{ item.title }}
+
+              <span class="news-source">
+                {{ item.source }}
+              </span>
+
+            </a>
+          </li>
+          {% endfor %}
+
+          {% for item in news %}
+          <li class="ticker-item">
+            <a href="{{ item.link }}"
+               target="_blank"
+               rel="noopener noreferrer"
+               class="news-link">
+
+              {{ item.title }}
+
+              <span class="news-source">
+                {{ item.source }}
+              </span>
+
+            </a>
+          </li>
+          {% endfor %}
+
+        </ul>
+
+      </div>
+
+      <div class="small">Hover to pause.</div>
+
+    {% else %}
+
+      <p class="dash-subtitle">News temporarily unavailable.</p>
+
+    {% endif %}
+
+  </div>
+
+
+  <!-- Recent Logins -->
+  <div class="panel">
+
+    <div class="panel-title">Recent Logins</div>
+
+    {% if recent_logins and recent_logins|length > 0 %}
+
+      <div class="ticker" aria-label="Recent logins ticker">
+
+        <ul class="ticker-track">
+
+          {% for u in recent_logins %}
+          <li class="ticker-item">
+
+            <span class="ticker-email">{{ u.email }}</span>
+
+            <span class="ticker-meta">
+              {% if u.last_login_at %}
+                {{ u.last_login_at.strftime('%Y-%m-%d %H:%M') }} UTC
+              {% else %}
+                Never
+              {% endif %}
+            </span>
+
+          </li>
+          {% endfor %}
+
+          {% for u in recent_logins %}
+          <li class="ticker-item">
+
+            <span class="ticker-email">{{ u.email }}</span>
+
+            <span class="ticker-meta">
+              {% if u.last_login_at %}
+                {{ u.last_login_at.strftime('%Y-%m-%d %H:%M') }} UTC
+              {% else %}
+                Never
+              {% endif %}
+            </span>
+
+          </li>
+          {% endfor %}
+
+        </ul>
+
+      </div>
+
+      <div class="small">Hover to pause.</div>
+
+    {% else %}
+
+      <p class="dash-subtitle">No login activity yet.</p>
+
+    {% endif %}
+
+  </div>
+  
+  <div class="panel">
+
+  <div class="panel-title">Recent Wi-Fi CVEs</div>
+
+  {% if cves and cves|length > 0 %}
+
+  <div class="ticker">
+
+    <ul class="ticker-track">
+
+      {% for cve in cves %}
+      <li class="ticker-item">
+
+        <a href="{{ cve.link }}"
+           target="_blank"
+           rel="noopener noreferrer"
+           class="news-link">
+
+          <strong>{{ cve.id }}</strong> — {{ cve.description }}
+
+        </a>
+
+      </li>
+      {% endfor %}
+
+      {% for cve in cves %}
+      <li class="ticker-item">
+
+        <a href="{{ cve.link }}"
+           target="_blank"
+           rel="noopener noreferrer"
+           class="news-link">
+
+          <strong>{{ cve.id }}</strong> — {{ cve.description }}
+
+        </a>
+
+      </li>
+      {% endfor %}
+
+    </ul>
+
+  </div>
+
+  <div class="small">Hover to pause.</div>
+
+  {% else %}
+
+  <p class="dash-subtitle">No Wi-Fi related CVEs found.</p>
+
+  {% endif %}
+
+</div>
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,293 @@
+/* =====================================================
+   INSTRUCTOR PAGE LAYOUT
+   (Dashboard-focused; no admin table/reset/delete styles)
+===================================================== */
+
+main.main-content {
+  width: fit-content;                  /* card grows to content */
+  max-width: 95vw;                     /* never exceed viewport */
+  margin: 1rem auto 2rem;              /* centered like base */
+  text-align: left;                    /* dashboard content should be left-aligned */
+  box-shadow: 0 0 30px rgba(0, 255, 255, 0.18);
+}
+
+
+/* =====================================================
+   PAGE TITLE
+===================================================== */
+
+.page-title {
+  margin: 0 0 18px;
+}
+
+
+/* =====================================================
+   ALERT BOXES (Success / Error)
+===================================================== */
+
+.alert {
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.04);
+  padding: 14px 16px;
+  border-radius: 14px;
+  margin-bottom: 18px;
+  text-align: left;
+}
+
+.alert-success {
+  border-color: rgba(0, 255, 170, 0.4);
+  box-shadow: 0 0 18px rgba(0, 255, 170, 0.12);
+}
+
+.alert-error {
+  border-color: rgba(255, 80, 80, 0.6);
+  box-shadow: 0 0 18px rgba(255, 80, 80, 0.15);
+}
+
+.small {
+  opacity: 0.8;
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+
+/* =====================================================
+   INSTRUCTOR DASHBOARD
+===================================================== */
+
+.dash-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.dash-subtitle {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+}
+
+.dash-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dash-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(0,0,0,0.12);
+  color: var(--text-light);
+  font-weight: 650;
+  text-decoration: none;
+  transition: transform 0.15s ease, box-shadow 0.25s ease, border-color 0.2s ease;
+}
+
+.dash-btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(0, 255, 255, 0.22);
+  box-shadow: 0 0 14px rgba(0, 255, 255, 0.12);
+  color: var(--accent);
+}
+
+
+/* =====================================================
+   STAT CARDS (Top KPIs)
+===================================================== */
+
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 14px;
+  margin-top: 10px;
+}
+
+.stat-card {
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.03);
+  border-radius: 14px;
+  padding: 14px;
+  text-align: left;
+}
+
+.stat-label {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.stat-value {
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--accent);
+  text-shadow: 0 0 12px rgba(0,255,255,0.12);
+  line-height: 1.1;
+}
+
+.stat-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+
+/* =====================================================
+   PANELS
+   Default: 2 columns (nice for instructor dashboards)
+   Add class "dash-panels--3" in HTML if you ever want 3 columns.
+===================================================== */
+
+.dash-panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+/* Optional 3-column mode (future) */
+.dash-panels.dash-panels--3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.panel {
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(0,0,0,0.10);
+  border-radius: 14px;
+  padding: 14px;
+  text-align: left;
+}
+
+.panel-title {
+  font-weight: 800;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+
+.panel-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.panel-list li {
+  margin: 6px 0;
+  color: var(--text-muted);
+}
+
+
+/* =====================================================
+   TICKER WINDOW (Used for News / CVEs / Recent Activity)
+===================================================== */
+
+.ticker {
+  position: relative;
+  height: 160px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.03);
+  border-radius: 14px;
+  padding: 8px 10px;
+}
+
+.ticker-track {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  animation: tickerScroll 18s linear infinite;
+}
+
+/* Pause on hover */
+.ticker:hover .ticker-track {
+  animation-play-state: paused;
+}
+
+.ticker-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+
+  padding: 10px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(0,0,0,0.12);
+}
+
+.ticker-email {
+  font-weight: 650;
+  color: var(--text-light);
+  max-width: 70%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ticker-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+@keyframes tickerScroll {
+  0%   { transform: translateY(0); }
+  100% { transform: translateY(-50%); }
+}
+
+
+/* =====================================================
+   SECURITY NEWS WIDGET
+===================================================== */
+
+.news-link {
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  color: var(--text-light);
+  font-size: 13px;
+}
+
+.news-link:hover {
+  color: var(--accent);
+}
+
+.news-source {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+
+/* =====================================================
+   RESPONSIVE
+===================================================== */
+
+@media (max-width: 900px) {
+  .dash-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dash-panels {
+    grid-template-columns: 1fr;
+  }
+
+  .dash-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 768px) {
+  main.main-content {
+    width: 95vw;
+    max-width: 95vw;
+  }
+}

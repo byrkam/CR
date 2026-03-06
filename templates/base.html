@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ title or "Wi-Fi Labs" }}</title>
+
+  <!-- Keep your original creative theme -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}" />
+
+  <!-- Page-specific CSS (lightweight, no global overrides) -->
+  {% if page_style %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/' + page_style) }}" />
+  {% endif %}
+</head>
+<body>
+  <!-- ====== HERO LOGO SECTION (unchanged aesthetic) ====== -->
+  <section class="hero-logo">
+    <img src="{{ url_for('static', filename='icons/wifi-logo.png') }}" alt="Wi-Fi Labs Logo" class="hero-img" />
+    <h1 class="hero-title">B² Wi-Fi Labs</h1>
+    <p class="hero-subtitle">Cybersecurity • Wireless • Education</p>
+  </section>
+
+  <!-- ====== NAVBAR (only when logged in AND not on home) ====== -->
+{% if session.get('user_id') and not request.endpoint == 'home' %}
+<header class="navbar logged-in-navbar">
+  <nav class="nav-inner">
+
+    <div class="nav-left">
+      <!-- Home -->
+      <a href="{{ url_for('dashboard_redirect') }}"
+         class="nav-link {% if request.endpoint in ['admin_dashboard','instructor_dashboard','learner_dashboard'] %}active{% endif %}">
+         🏠 Home
+      </a>
+
+      {% if current_user_role == "admin" %}
+    <a href="{{ url_for('admin_users') }}"
+        class="nav-link {% if request.endpoint == 'admin_users' %}active{% endif %}">
+        👥 Users
+    </a>
+
+    <a href="{{ url_for('admin_scenarios') }}"
+        class="nav-link {% if request.endpoint == 'admin_scenarios' %}active{% endif %}">
+        📚 Scenarios
+    </a>
+
+    <a href="{{ url_for('admin_assets') }}"
+        class="nav-link {% if request.endpoint == 'admin_assets' %}active{% endif %}">
+        📦 Assets
+    </a>
+{% endif %}
+{% if current_user_role == "instructor" %}
+
+<a href="{{ url_for('instructor_scenarios') }}"
+   class="nav-link {% if request.endpoint == 'instructor_scenarios' %}active{% endif %}">
+   🛠 Scenarios
+</a>
+
+<a href="{{ url_for('instructor_performance') }}"
+   class="nav-link {% if request.endpoint == 'instructor_performance' %}active{% endif %}">
+   📊 Performance
+</a>
+
+<a href="{{ url_for('instructor_learners') }}"
+   class="nav-link {% if request.endpoint == 'instructor_learners' %}active{% endif %}">
+   👥 Learners
+</a>
+
+<a href="{{ url_for('instructor_reports') }}"
+   class="nav-link {% if request.endpoint == 'instructor_reports' %}active{% endif %}">
+   📑 Reports
+</a>
+
+{% endif %}
+{% if current_user_role == "learner" %}
+  <a href="{{ url_for('learner_scenarios') }}"
+     class="nav-link {% if request.endpoint == 'learner_scenarios' %}active{% endif %}">
+    🧪 My Scenarios
+  </a>
+
+  <a href="{{ url_for('learner_submissions') }}"
+     class="nav-link {% if request.endpoint == 'learner_submissions' %}active{% endif %}">
+    📤 Submissions
+  </a>
+
+  <a href="{{ url_for('learner_resources') }}"
+     class="nav-link {% if request.endpoint == 'learner_resources' %}active{% endif %}">
+    📚 Resources
+  </a>
+
+  <a href="{{ url_for('learner_help') }}"
+     class="nav-link {% if request.endpoint == 'learner_help' %}active{% endif %}">
+    🆘 Help/Support
+  </a>
+
+{% endif %}
+    </div>
+
+    <div class="nav-right">
+      <!-- Profile -->
+      <a href="{{ url_for('profile') }}"
+         class="nav-link {% if request.endpoint == 'profile' %}active{% endif %}">
+         👤 Profile
+      </a>
+
+      <!-- Logout -->
+      <a href="{{ url_for('logout') }}"
+         class="nav-link {% if request.endpoint == 'logout-btn' %}active{% endif %}">
+         🚪 Logout
+      </a>
+    </div>
+
+  </nav>
+</header>
+{% endif %}
+
+  <!-- ====== MAIN CONTENT CARD (from your theme) ====== -->
+  <main class="main-content">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="footer">
+    <p>🔐 A Cybersecurity Learning Environment — Wi-Fi Labs © 2025</p>
+  </footer>
+</body>
+</html>
+

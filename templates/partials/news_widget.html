@@ -1,0 +1,59 @@
+<div class="panel">
+
+<div class="panel-title">Wi-Fi Security News</div>
+
+{% if news and news|length > 0 %}
+
+<div class="ticker">
+
+<ul class="ticker-track">
+
+{% for item in news %}
+<li class="ticker-item">
+
+<a href="{{ item.link }}"
+   target="_blank"
+   rel="noopener noreferrer"
+   class="news-link">
+
+{{ item.title }}
+
+<span class="news-source">
+{{ item.source }}
+</span>
+
+</a>
+
+</li>
+{% endfor %}
+
+{% for item in news %}
+<li class="ticker-item">
+
+<a href="{{ item.link }}"
+   target="_blank"
+   rel="noopener noreferrer"
+   class="news-link">
+
+{{ item.title }}
+
+<span class="news-source">
+{{ item.source }}
+</span>
+
+</a>
+
+</li>
+{% endfor %}
+
+</ul>
+
+</div>
+
+{% else %}
+
+<p class="dash-subtitle">News temporarily unavailable.</p>
+
+{% endif %}
+
+</div>

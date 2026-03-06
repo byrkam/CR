@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Welcome to <span class="highlight">B² Wi-Fi Labs</span></h2>
+<p class="subtitle">Cybersecurity • Wireless • Education</p>
+
+<div class="home-cta">
+  <a href="{{ url_for('login_instructor') }}">🧑‍🏫 Instructor Login</a>
+  <a href="{{ url_for('login_learner') }}">🎓 Learner Login</a>
+  <a href="{{ url_for('login') }}">👑 Admin Login</a>
+</div>
+{% endblock %}
+

@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Wi-Fi Testbed Generator</title>
+
+  <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+  <script src="{{ url_for('static', filename='js/topology.js') }}"></script>
+
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      margin: 40px auto;
+      max-width: 980px;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    :root {
+      --bg: #f8f9fa;
+      --card: #ffffff;
+      --text: #333;
+      --accent: #007bff;
+      --border: #ccc;
+    }
+
+    body.dark {
+      --bg: #1e1e1e;
+      --card: #2a2a2a;
+      --text: #f0f0f0;
+      --accent: #0d6efd;
+      --border: #444;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      font-size: 26px;
+      margin: 0;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      opacity: 0.8;
+    }
+
+    textarea {
+      width: 100%;
+      padding: 10px;
+      font-size: 15px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--card);
+      color: var(--text);
+      box-sizing: border-box;
+      resize: vertical;
+    }
+
+    button {
+      background-color: var(--accent);
+      color: white;
+      padding: 10px 16px;
+      font-size: 15px;
+      border: none;
+      border-radius: 5px;
+      margin-top: 10px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      filter: brightness(1.05);
+    }
+    
+    /* Make vis-network tooltips show newlines nicely */
+    .vis-tooltip {
+    white-space: pre-line;
+    font-size: 12px;
+    padding: 6px 8px;
+    }
+
+
+    .card {
+      background: var(--card);
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+      margin-top: 20px;
+    }
+
+    .preset-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 12px;
+      margin-top: 10px;
+    }
+
+    .preset {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      cursor: pointer;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease;
+      background: var(--card);
+    }
+
+    .preset:hover {
+      border-color: var(--accent);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      transform: translateY(-1px);
+    }
+
+    .preset-title {
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .preset-body {
+      font-size: 12px;
+      color: #666;
+    }
+
+    body.dark .preset-body {
+      color: #aaa;
+    }
+
+    pre {
+      background: #272822;
+      color: #f8f8f2;
+      padding: 15px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 14px;
+      margin: 0;
+    }
+
+    .tabs {
+      display: flex;
+      margin-top: 30px;
+    }
+
+    .tab {
+      flex: 1;
+      text-align: center;
+      padding: 10px;
+      cursor: pointer;
+      background: var(--card);
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s ease;
+      font-size: 14px;
+    }
+
+    .tab.active {
+      border-bottom: 3px solid var(--accent);
+      font-weight: 600;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+      animation: fadeIn 0.25s ease-in-out;
+    }
+
+    #network {
+      width: 100%;
+      height: 400px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin-top: 10px;
+    }
+
+    .toggle-theme {
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--accent);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .footer {
+      margin-top: 40px;
+      text-align: center;
+      font-size: 13px;
+      color: #888;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .hint {
+      font-size: 13px;
+      color: #777;
+      margin-bottom: 6px;
+    }
+
+    body.dark .hint {
+      color: #aaa;
+    }
+
+    .layout-results-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-top: 24px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      font-size: 11px;
+      color: #555;
+    }
+
+    body.dark .pill {
+      color: #ccc;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    /* Guidance panel */
+
+    .guide-box {
+      margin: 12px 0 16px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px dashed var(--border);
+      background: rgba(0, 0, 0, 0.02);
+    }
+
+    body.dark .guide-box {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .guide-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 6px;
+    }
+
+    .guide-title {
+      font-size: 13px;
+      font-weight: 600;
+      opacity: 0.9;
+    }
+
+    .scenario-pill {
+      font-size: 11px;
+      border-radius: 999px;
+      padding: 3px 8px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      opacity: 0.9;
+    }
+
+    .guide-text {
+      font-size: 12px;
+      margin: 0 0 8px;
+      line-height: 1.4;
+    }
+
+    .field-tips-title {
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 4px;
+      opacity: 0.85;
+    }
+
+    .field-tips {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 6px 16px;
+      font-size: 11.5px;
+    }
+
+    .field-tip-name {
+      font-weight: 600;
+    }
+
+    .field-tip-desc {
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>🧪 Wi-Fi Testbed Generator</h1>
+      <div class="subtitle">
+        Step 1: pick a base configuration. Step 2: adjust values (SSID, channel, passphrase, etc.).
+      </div>
+    </div>
+    <div class="toggle-theme" onclick="toggleTheme()">
+      🌓 <span>Toggle theme</span>
+    </div>
+  </header>
+
+  <!-- STEP 1: preset selection -->
+  <div class="card">
+    <h2>Step 1: Choose a base configuration</h2>
+    <div class="hint">
+      Start from one of the predefined scenarios below. You’ll fine-tune the details in the next step.
+    </div>
+
+    <div class="preset-grid">
+      <div class="preset" onclick="loadPreset('open-basic')">
+        <div class="preset-title">Open lab</div>
+        <div class="preset-body">
+          1× AP with <code>open</code> network, a few STAs.
+          Good for connectivity / namespace testing.
+        </div>
+      </div>
+      <div class="preset" onclick="loadPreset('wpa2-basic')">
+        <div class="preset-title">WPA2 lab</div>
+        <div class="preset-body">
+          1× WPA2-Personal AP (<code>wpa2-psk</code>), passphrase-based, multiple STAs.
+        </div>
+      </div>
+      <div class="preset" onclick="loadPreset('wpa3-basic')">
+        <div class="preset-title">WPA3 lab</div>
+        <div class="preset-body">
+          1× WPA3-Personal AP (<code>wpa3-sae</code>), modern SAE handshake.
+        </div>
+      </div>
+      <div class="preset" onclick="loadPreset('wpa2-enterprise')">
+        <div class="preset-title">WPA2-Enterprise</div>
+        <div class="preset-body">
+          WPA2-Enterprise (<code>wpa2-enterprise</code>) with RADIUS block for 802.1X tests.
+        </div>
+      </div>
+      <div class="preset" onclick="loadPreset('wpa3-enterprise')">
+        <div class="preset-title">WPA3-Enterprise</div>
+        <div class="preset-body">
+          WPA3-Enterprise (<code>wpa3-enterprise</code>), like WPA2-Enterprise + mandatory PMF.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2: description + generate -->
+  <div id="step2" class="card {% if not show_step2 %}hidden{% endif %}">
+    <form method="POST" autocomplete="off">
+      <h2 id="step2-title">Step 2: Adjust and generate</h2>
+
+      <div class="hint">
+        Do not add or remove AP/RADIUS blocks.
+        You can change values (SSID, Band, Channel, Passphrase, Stations, RADIUS IP, etc.)
+        but the <code>Security:</code> lines are fixed by your preset and should not be edited.
+      </div>
+
+      <!-- Hidden scenario field -->
+      <input type="hidden" name="scenario" id="scenario" value="{{ scenario or '' }}">
+
+      {% if errors %}
+        <div class="guide-box" style="border-color:#c0392b; background: rgba(192,57,43,0.06);">
+          <div class="guide-title" style="color:#c0392b; margin-bottom:6px;">
+            Please fix these issues before generating:
+          </div>
+          <ul style="margin:0; padding-left:18px; font-size:13px;">
+            {% for e in errors %}
+              <li>{{ e }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+
+      <!-- Scenario overview + field tips -->
+      <div class="guide-box">
+        <div class="guide-header">
+          <span class="guide-title">Scenario overview</span>
+          <span id="scenario-label" class="scenario-pill">No scenario selected</span>
+        </div>
+        <p id="scenario-description" class="guide-text">
+          Select a preset in Step 1 to see guidance for that scenario.
+        </p>
+
+        <div class="field-tips-title">Field tips</div>
+        <div class="field-tips">
+          <div class="field-tip">
+            <div class="field-tip-name">Country:</div>
+            <div class="field-tip-desc">
+              Two-letter regulatory country code (e.g. <code>GR</code>, <code>US</code>, <code>DE</code>).
+              Mapped to <code>country_code</code> in hostapd.
+            </div>
+          </div>
+          <div class="field-tip">
+            <div class="field-tip-name">AP N:</div>
+            <div class="field-tip-desc">
+              Logical access point index. Keep the <code>AP 1:</code>, <code>AP 2:</code> lines as they are;
+              they define separate APs.
+            </div>
+          </div>
+          <div class="field-tip">
+            <div class="field-tip-name">SSID:</div>
+            <div class="field-tip-desc">
+              Network name broadcast by the AP (what clients see in the Wi-Fi list).
+              Use quotes, e.g. <code>SSID: "lab-open"</code>.
+            </div>
+          </div>
+          <div class="field-tip">
+            <div class="field-tip-name">Band:</div>
+            <div class="field-tip-desc">
+              Frequency band for this AP, e.g. <code>2.4 GHz</code> or <code>5 GHz</code>.
+              This controls hostapd <code>hw_mode</code> and default channel range.
+            </div>
+          </div>
+          <div class="field-tip">
+            <div class="field-tip-name">Channel:</div>
+            <div class="field-tip-desc">
+              Channel number within the band (e.g. 1–13 for 2.4 GHz, 36+ for 5 GHz).
+              Make sure it’s valid in your selected country.
+            </div>
+          </div>
+          <div class="field-tip">
+            <div class="field-tip-name">Security:</div>
+            <div class="field-tip-desc">
+              Fixed by the preset (<code>open</code>, <code>wpa2-psk</code>, <code>wpa3-sae</code>,
+              <code>wpa2-enterprise</code>, <code>wpa3-enterprise</code>).
+              Do <strong>not</strong> change this line.
+            </div>
+          </div>
+          <div class="field-tip">
+            <div class="field-tip-name">Passphrase:</div>
+            <div class="field-tip-desc">
+              Shared secret for WPA2/WPA3-Personal presets.
+              All STAs will use this in their <code>wpa_supplicant</code> configs.
+            </div>
+          </div>
+          <div class="field-tip">
+            <div class="field-tip-name">Stations:</div>
+            <div class="field-tip-desc">
+              Number of simulated clients that will connect to this AP.
+              Each becomes its own Linux namespace + interface.
+            </div>
+          </div>
+          <div class="field-tip">
+            <div class="field-tip-name">RADIUS Address / Port:</div>
+            <div class="field-tip-desc">
+              IP and UDP port of your RADIUS server for Enterprise presets.
+              Mapped to <code>auth_server_addr</code> and <code>auth_server_port</code>.
+            </div>
+          </div>
+          <div class="field-tip">
+            <div class="field-tip-name">Shared secret:</div>
+            <div class="field-tip-desc">
+              RADIUS shared secret between AP and RADIUS.
+              Used in hostapd <code>auth_server_shared_secret</code>.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <textarea name="description" id="description" rows="12" required>{{ description|default('', true) }}</textarea><br>
+
+      <button type="submit">Generate testbed</button>
+    </form>
+  </div>
+
+  {% if script or topology %}
+    <div class="layout-results-header">
+      <h2 style="margin:0;">Results</h2>
+    </div>
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('script')">📜 Script</div>
+      <div class="tab" onclick="switchTab('topology')">🗺 Topology</div>
+      <div class="tab" onclick="switchTab('configs')">⚙️ Configs</div>
+    </div>
+  {% endif %}
+
+  {% if script %}
+    <div id="script" class="tab-content active card">
+      <h3>Shell Script (mac80211_hwsim + namespaces)</h3>
+      <pre>{{ script }}</pre>
+    </div>
+  {% endif %}
+
+  {% if topology %}
+    <div id="topology" class="tab-content card">
+      <h3>Visual Topology</h3>
+      <div id="network"></div>
+      <script>
+        const topologyData = {{ topology | tojson }};
+        renderTopology(topologyData);
+      </script>
+    </div>
+  {% endif %}
+
+  {% if topology and configs %}
+    <div id="configs" class="tab-content card">
+      <h3>Generated Configs</h3>
+      {% for ap in topology.aps %}
+        <details>
+          <summary>AP {{ ap.id }} · SSID "{{ ap.ssid }}" · {{ ap.security_mode }}</summary>
+          <pre>{{ configs.ap[ap.id] }}</pre>
+        </details>
+        {% for sta in ap.stas %}
+        <details>
+          <summary>{{ sta }} → {{ ap.ssid }}</summary>
+          <pre>{{ configs.sta[sta] }}</pre>
+        </details>
+        {% endfor %}
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <div class="footer">
+    Built with Flask + vis-network · presets: Open, WPA2, WPA3, WPA2-Enterprise, WPA3-Enterprise
+  </div>
+
+  <script>
+    function switchTab(id) {
+      document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+      const content = document.getElementById(id);
+      if (content) content.classList.add('active');
+      const tab = document.querySelector(`.tab[onclick="switchTab('${id}')"]`);
+      if (tab) tab.classList.add('active');
+    }
+
+    function toggleTheme() {
+      document.body.classList.toggle('dark');
+    }
+
+    function getDescriptionEl() {
+      return document.getElementById('description');
+    }
+
+    function getScenarioEl() {
+      return document.getElementById('scenario');
+    }
+
+    function showStep2() {
+      const step2 = document.getElementById('step2');
+      if (step2) {
+        step2.classList.remove('hidden');
+        step2.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+
+    function getScenarioLabelEl() {
+      return document.getElementById('scenario-label');
+    }
+
+    function getScenarioDescEl() {
+      return document.getElementById('scenario-description');
+    }
+
+    const SCENARIO_INFO = {
+      'open-basic': {
+        label: 'Open lab',
+        desc: 'Single AP with Security: open (no encryption). Good for basic connectivity, namespace plumbing, and quick experiments where authentication is not important.'
+      },
+      'wpa2-basic': {
+        label: 'WPA2 lab',
+        desc: 'Single AP with Security: wpa2-psk (WPA2-Personal). All stations share the same passphrase. Ideal for classic WPA2 tests and interoperability checks.'
+      },
+      'wpa3-basic': {
+        label: 'WPA3 lab',
+        desc: 'Single AP with Security: wpa3-sae (WPA3-Personal). Uses SAE handshake and protected management frames; good for modern security experiments.'
+      },
+      'wpa2-enterprise': {
+        label: 'WPA2-Enterprise',
+        desc: 'Single AP with Security: wpa2-enterprise, backed by a RADIUS server. Useful for 802.1X/EAP experiments and enterprise-style deployments.'
+      },
+      'wpa3-enterprise': {
+        label: 'WPA3-Enterprise',
+        desc: 'Single AP with Security: wpa3-enterprise. Similar to WPA2-Enterprise but with mandatory PMF; suitable for high-security enterprise scenarios.'
+      }
+    };
+
+    function updateGuidance(scenarioId) {
+      const labelEl = getScenarioLabelEl();
+      const descEl = getScenarioDescEl();
+      const info = SCENARIO_INFO[scenarioId];
+
+      if (info) {
+        labelEl.textContent = info.label;
+        descEl.textContent = info.desc;
+      } else {
+        labelEl.textContent = 'No scenario selected';
+        descEl.textContent = 'Select a preset in Step 1 to see guidance for that scenario.';
+      }
+    }
+
+    // STEP 1 → STEP 2 presets
+    function loadPreset(id) {
+      showStep2();
+      const textarea = getDescriptionEl();
+      const scenarioInput = getScenarioEl();
+      let preset = '';
+
+      if (id === 'open-basic') {
+        preset = `Country: GR
+
+AP 1:
+  SSID: "lab-open"
+  Band: 2.4 GHz
+  Channel: 6
+  Security: open
+  Stations: 4`;
+      } else if (id === 'wpa2-basic') {
+        preset = `Country: GR
+
+AP 1:
+  SSID: "lab-wpa2"
+  Band: 2.4 GHz
+  Channel: 6
+  Security: wpa2-psk
+  Passphrase: "labpassword"
+  Stations: 4`;
+      } else if (id === 'wpa3-basic') {
+        preset = `Country: GR
+
+AP 1:
+  SSID: "lab-wpa3"
+  Band: 5 GHz
+  Channel: 36
+  Security: wpa3-sae
+  Passphrase: "labwpa3pass"
+  Stations: 3`;
+      } else if (id === 'wpa2-enterprise') {
+        preset = `Country: GR
+
+AP 1:
+  SSID: "corp-wpa2-ent"
+  Band: 5 GHz
+  Channel: 36
+  Security: wpa2-enterprise
+  Stations: 3
+
+RADIUS:
+  Address: 192.168.50.10
+  Port: 1812
+  Shared secret: "radiussecret"`;
+      } else if (id === 'wpa3-enterprise') {
+        preset = `Country: GR
+
+AP 1:
+  SSID: "corp-wpa3-ent"
+  Band: 5 GHz
+  Channel: 36
+  Security: wpa3-enterprise
+  Stations: 3
+
+RADIUS:
+  Address: 192.168.60.10
+  Port: 1812
+  Shared secret: "radiussecret"`;
+      }
+
+      if (textarea && preset) {
+        textarea.value = preset;
+        textarea.focus();
+        textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
+      }
+      if (scenarioInput) {
+        scenarioInput.value = id;
+      }
+      updateGuidance(id);
+    }
+
+    // Initial guidance restore after POST
+    document.addEventListener('DOMContentLoaded', () => {
+      const scenarioFromServer = "{{ scenario or '' }}";
+      updateGuidance(scenarioFromServer);
+    });
+  </script>
+</body>
+</html>
+

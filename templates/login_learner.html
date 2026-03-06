@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<p class="back-home"><a href="{{ url_for('home') }}">← Back to Home</a></p>
+<h2>Learner Login</h2>
+
+<form method="POST" autocomplete="off" autocapitalize="none" spellcheck="false">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="text" name="email" placeholder="Email" required autocomplete="off">
+  <div class="password-container">
+    <input type="password" name="password" id="password" placeholder="Password" required autocomplete="new-password">
+    <span class="toggle-password" onclick="togglePassword()">👁️</span>
+  </div>
+  <button type="submit">Login</button>
+</form>
+
+<p>Don’t have an account? <a href="{{ url_for('signup_learner') }}">Sign up here</a>.</p>
+{% if error %}<p style="color:red">{{ error }}</p>{% endif %}
+<script src="{{ url_for('static', filename='js/password_validation.js') }}"></script>
+{% endblock %}
+

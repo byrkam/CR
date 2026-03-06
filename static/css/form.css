@@ -1,0 +1,120 @@
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+input[type="text"],
+input[type="password"] {
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 10px;
+  color: #e6edf3;
+  font-size: 1rem;
+  transition: border 0.2s ease;
+}
+
+input:focus {
+  outline: none;
+  border-color: #00bcd4;
+}
+
+/* Back-to-home button */
+.back-home {
+  text-align: left;
+  margin-bottom: 12px;
+}
+
+.back-home a {
+  display: inline-block;
+  padding: 6px 14px;
+  background: #00bcd4;
+  color: white;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 500;
+  transition: background 0.3s ease, transform 0.2s ease;
+}
+
+.back-home a:hover {
+  background: #0097a7;
+  transform: translateY(-2px);
+}
+
+/* Password field + icon */
+.password-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-container input {
+  width: 100%;
+  padding-right: 36px;
+}
+
+.toggle-password {
+  position: absolute;
+  right: 10px;
+  cursor: pointer;
+  color: #aaa;
+  user-select: none;
+  transition: color 0.3s ease, transform 0.2s ease;
+}
+
+.toggle-password:hover {
+  color: #00bcd4;
+  transform: scale(1.2);
+}
+
+/* Password rules */
+#password-rules {
+  list-style: none;
+  padding-left: 0;
+  margin-top: 8px;
+  font-size: 0.9rem;
+  color: #ccc;
+}
+
+#password-rules li {
+  display: flex;
+  align-items: center;
+  margin: 4px 0;
+}
+
+.dot {
+  height: 10px;
+  width: 10px;
+  border-radius: 50%;
+  background-color: #d9534f;
+  display: inline-block;
+  margin-right: 8px;
+  transition: background-color 0.3s ease;
+}
+
+.dot.valid {
+  background-color: #5cb85c;
+}
+
+/* Strength bar */
+#strength-wrapper {
+  margin-top: 12px;
+}
+
+#strength-bar {
+  height: 8px;
+  width: 0%;
+  background-color: #d9534f;
+  border-radius: 4px;
+  transition: width 0.4s ease, background-color 0.4s ease;
+}
+
+#strength-label {
+  font-size: 0.9rem;
+  margin-top: 5px;
+  color: #ccc;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
