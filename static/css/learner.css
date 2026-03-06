@@ -1,14 +1,20 @@
 /* =====================================================
-   INSTRUCTOR PAGE LAYOUT
-   (Dashboard-focused; no admin table/reset/delete styles)
+   LEARNER PAGE LAYOUT
+   Default layout for dashboard / scenarios / submissions
 ===================================================== */
 
 main.main-content {
-  width: fit-content;                  /* card grows to content */
-  max-width: 95vw;                     /* never exceed viewport */
-  margin: 1rem auto 2rem;              /* centered like base */
-  text-align: left;                    /* dashboard content should be left-aligned */
+  width: fit-content;
+  max-width: 95vw;
+  margin: 1rem auto 2rem;
+  text-align: left;
   box-shadow: 0 0 30px rgba(0, 255, 255, 0.18);
+}
+
+/* Wider layout ONLY for Resources page */
+main.main-content:has(.resources-layout) {
+  width: min(1200px, 95vw);
+  max-width: 95vw;
 }
 
 
@@ -20,9 +26,14 @@ main.main-content {
   margin: 0 0 18px;
 }
 
+.dash-subtitle {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+}
+
 
 /* =====================================================
-   ALERT BOXES (Success / Error)
+   ALERT BOXES
 ===================================================== */
 
 .alert {
@@ -52,7 +63,7 @@ main.main-content {
 
 
 /* =====================================================
-   INSTRUCTOR DASHBOARD
+   DASHBOARD
 ===================================================== */
 
 .dash-header {
@@ -61,11 +72,6 @@ main.main-content {
   align-items: flex-start;
   gap: 14px;
   margin-bottom: 18px;
-}
-
-.dash-subtitle {
-  margin: 6px 0 0;
-  color: var(--text-muted);
 }
 
 .dash-actions {
@@ -94,11 +100,6 @@ main.main-content {
   box-shadow: 0 0 14px rgba(0, 255, 255, 0.12);
   color: var(--accent);
 }
-
-
-/* =====================================================
-   STAT CARDS (Top KPIs)
-===================================================== */
 
 .dash-grid {
   display: grid;
@@ -138,8 +139,6 @@ main.main-content {
 
 /* =====================================================
    PANELS
-   Default: 2 columns (nice for instructor dashboards)
-   Add class "dash-panels--3" in HTML if you ever want 3 columns.
 ===================================================== */
 
 .dash-panels {
@@ -149,17 +148,13 @@ main.main-content {
   margin-top: 16px;
 }
 
-/* Optional 3-column mode (future) */
-.dash-panels.dash-panels--3 {
-  grid-template-columns: repeat(3, 1fr);
-}
-
 .panel {
   border: 1px solid rgba(255,255,255,0.10);
   background: rgba(0,0,0,0.10);
   border-radius: 14px;
   padding: 14px;
   text-align: left;
+  min-width: 0;
 }
 
 .panel-title {
@@ -180,7 +175,7 @@ main.main-content {
 
 
 /* =====================================================
-   TICKER WINDOW (Used for News / CVEs / Recent Activity)
+   TICKER WINDOWS (NEWS / CVEs / ACTIVITY)
 ===================================================== */
 
 .ticker {
@@ -197,15 +192,12 @@ main.main-content {
   list-style: none;
   margin: 0;
   padding: 0;
-
   display: flex;
   flex-direction: column;
   gap: 8px;
-
   animation: tickerScroll 18s linear infinite;
 }
 
-/* Pause on hover */
 .ticker:hover .ticker-track {
   animation-play-state: paused;
 }
@@ -215,7 +207,6 @@ main.main-content {
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-
   padding: 10px 10px;
   border-radius: 12px;
   border: 1px solid rgba(255,255,255,0.08);
@@ -244,7 +235,7 @@ main.main-content {
 
 
 /* =====================================================
-   SECURITY NEWS WIDGET
+   SECURITY NEWS / CVE LINKS
 ===================================================== */
 
 .news-link {
@@ -267,6 +258,119 @@ main.main-content {
 
 
 /* =====================================================
+   LEARNER RESOURCES
+===================================================== */
+
+.resources-layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  margin-top: 14px;
+}
+
+.resources-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.resource-tab {
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(0,0,0,0.10);
+  color: var(--text-light);
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.resource-tab:hover {
+  transform: translateY(-1px);
+  border-color: rgba(0,255,255,0.22);
+  box-shadow: 0 0 12px rgba(0,255,255,0.12);
+}
+
+.resource-tab.active {
+  border-color: rgba(0,255,255,0.35);
+  background: rgba(0,255,255,0.08);
+  color: var(--accent);
+  box-shadow: 0 0 14px rgba(0,255,255,0.14);
+}
+
+.resources-content {
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(0,0,0,0.10);
+  border-radius: 16px;
+  padding: 16px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.resource-panel {
+  display: none;
+}
+
+.resource-panel.active {
+  display: block;
+}
+
+.resource-title {
+  margin: 0 0 14px;
+  color: var(--accent);
+  text-shadow: 0 0 10px var(--accent-glow);
+}
+
+.resource-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 14px;
+  min-width: 0;
+}
+
+.resource-card {
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.03);
+  border-radius: 14px;
+  padding: 14px;
+  text-align: left;
+  min-width: 0;
+}
+
+.resource-card h4 {
+  margin: 0 0 8px;
+  color: var(--text-light);
+}
+
+.resource-card p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+.resource-card pre {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(0,0,0,0.35);
+  border: 1px solid rgba(0,255,255,0.12);
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.resource-card code {
+  color: #bff9ff;
+  font-size: 0.9rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+
+/* =====================================================
    RESPONSIVE
 ===================================================== */
 
@@ -283,10 +387,29 @@ main.main-content {
     flex-direction: column;
     align-items: stretch;
   }
+
+  .resources-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .resources-sidebar {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .resource-tab {
+    width: auto;
+    flex: 1 1 180px;
+  }
 }
 
 @media (max-width: 768px) {
   main.main-content {
+    width: 95vw;
+    max-width: 95vw;
+  }
+
+  main.main-content:has(.resources-layout) {
     width: 95vw;
     max-width: 95vw;
   }

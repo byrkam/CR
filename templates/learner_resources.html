@@ -1,9 +1,170 @@
 {% extends "base.html" %}
 {% block content %}
+
 <h2 class="page-title">Resources</h2>
-<ul class="panel-list">
-  <li>Wi-Fi glossary (WPA2, WPA3, PMKID, EAPOL)</li>
-  <li>Tool guides (aircrack-ng, hcxdumptool)</li>
-  <li>Cheat sheets & safe lab rules</li>
-</ul>
+<p class="dash-subtitle">Reference material for Wi-Fi security labs and exercises.</p>
+
+<div class="resources-layout">
+
+  <!-- Left vertical subtabs -->
+  <aside class="resources-sidebar">
+    <button class="resource-tab active" onclick="showResourceTab('glossary', this)">
+      📘 Glossary
+    </button>
+    <button class="resource-tab" onclick="showResourceTab('tools', this)">
+      🛠 Tool Guides
+    </button>
+    <button class="resource-tab" onclick="showResourceTab('cheatsheets', this)">
+      📄 Cheat Sheets
+    </button>
+  </aside>
+
+  <!-- Right content -->
+  <section class="resources-content">
+
+    <!-- GLOSSARY -->
+    <div id="glossary" class="resource-panel active">
+      <h3 class="resource-title">Glossary</h3>
+
+      <div class="resource-cards">
+        <div class="resource-card">
+          <h4>SSID</h4>
+          <p>The Wi-Fi network name broadcast by an access point.</p>
+        </div>
+
+        <div class="resource-card">
+          <h4>BSSID</h4>
+          <p>The MAC address that uniquely identifies a wireless access point.</p>
+        </div>
+
+        <div class="resource-card">
+          <h4>Handshake</h4>
+          <p>The authentication exchange captured during WPA/WPA2 connection setup.</p>
+        </div>
+
+        <div class="resource-card">
+          <h4>PMKID</h4>
+          <p>A value used in WPA/WPA2 authentication that can sometimes be attacked offline.</p>
+        </div>
+
+        <div class="resource-card">
+          <h4>Deauthentication</h4>
+          <p>A management frame used to disconnect a client from an access point.</p>
+        </div>
+
+        <div class="resource-card">
+          <h4>Monitor Mode</h4>
+          <p>A wireless interface mode that allows packet capture without joining a network.</p>
+        </div>
+
+        <div class="resource-card">
+          <h4>WPA2</h4>
+          <p>A widely used Wi-Fi security standard using PSK or Enterprise authentication.</p>
+        </div>
+
+        <div class="resource-card">
+          <h4>WPA3</h4>
+          <p>A newer Wi-Fi security standard with stronger protections such as SAE.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOOL GUIDES -->
+    <div id="tools" class="resource-panel">
+      <h3 class="resource-title">Tool Guides</h3>
+
+      <div class="resource-cards">
+        <div class="resource-card">
+          <h4>airmon-ng</h4>
+          <p>Used to enable monitor mode on a wireless interface.</p>
+          <pre><code>sudo airmon-ng start wlan0</code></pre>
+        </div>
+
+        <div class="resource-card">
+          <h4>airodump-ng</h4>
+          <p>Captures Wi-Fi traffic, access points, clients, and handshakes.</p>
+          <pre><code>sudo airodump-ng wlan0mon</code></pre>
+        </div>
+
+        <div class="resource-card">
+          <h4>aireplay-ng</h4>
+          <p>Injects packets such as deauthentication frames.</p>
+          <pre><code>sudo aireplay-ng --deauth 10 -a &lt;BSSID&gt; wlan0mon</code></pre>
+        </div>
+
+        <div class="resource-card">
+          <h4>Wireshark</h4>
+          <p>Analyzes PCAP captures and inspects management, control, and data frames.</p>
+          <pre><code>wireshark capture.pcap</code></pre>
+        </div>
+
+        <div class="resource-card">
+          <h4>hashcat</h4>
+          <p>Performs GPU-accelerated password cracking against captured hashes.</p>
+          <pre><code>hashcat -m 22000 hash.hc22000 wordlist.txt</code></pre>
+        </div>
+
+        <div class="resource-card">
+          <h4>hcxdumptool</h4>
+          <p>Captures PMKID and EAPOL material for offline analysis.</p>
+          <pre><code>sudo hcxdumptool -i wlan0mon -o capture.pcapng</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHEAT SHEETS -->
+    <div id="cheatsheets" class="resource-panel">
+      <h3 class="resource-title">Cheat Sheets</h3>
+
+      <div class="resource-cards">
+        <div class="resource-card">
+          <h4>Enable Monitor Mode</h4>
+          <pre><code>sudo airmon-ng start wlan0</code></pre>
+        </div>
+
+        <div class="resource-card">
+          <h4>Scan for Networks</h4>
+          <pre><code>sudo airodump-ng wlan0mon</code></pre>
+        </div>
+
+        <div class="resource-card">
+          <h4>Capture a Handshake</h4>
+          <pre><code>sudo airodump-ng -c 6 --bssid &lt;BSSID&gt; -w capture wlan0mon</code></pre>
+        </div>
+
+        <div class="resource-card">
+          <h4>Deauth a Client</h4>
+          <pre><code>sudo aireplay-ng --deauth 10 -a &lt;BSSID&gt; -c &lt;CLIENT&gt; wlan0mon</code></pre>
+        </div>
+
+        <div class="resource-card">
+          <h4>Convert PMKID/EAPOL for Hashcat</h4>
+          <pre><code>hcxpcapngtool -o hash.hc22000 capture.pcapng</code></pre>
+        </div>
+
+        <div class="resource-card">
+          <h4>Run Hashcat</h4>
+          <pre><code>hashcat -m 22000 hash.hc22000 wordlist.txt</code></pre>
+        </div>
+      </div>
+    </div>
+
+  </section>
+</div>
+
+<script>
+  function showResourceTab(tabId, btn) {
+    document.querySelectorAll('.resource-panel').forEach(panel => {
+      panel.classList.remove('active');
+    });
+
+    document.querySelectorAll('.resource-tab').forEach(tab => {
+      tab.classList.remove('active');
+    });
+
+    document.getElementById(tabId).classList.add('active');
+    btn.classList.add('active');
+  }
+</script>
+
 {% endblock %}
