@@ -1,35 +1,25 @@
-from flask import Flask, request, render_template, send_from_directory
-import os
 import json
+import os
 import re
+import shutil
 import subprocess
 from pathlib import Path
-
-app = Flask(__name__)
-
-# =========================
-# Defaults & knobs
-# =========================
+from typing import Any
 
 DEFAULTS = {
-    # Basic RF / PSK defaults
     "COUNTRY": "US",
-    "BAND": "2g",          # "2g" or "5g"
+    "BAND": "2g",
     "CHANNEL": 6,
     "CHANNEL_2G": 6,
     "CHANNEL_5G": 36,
     "CHANNEL_WIDTH": 20,
     "PASSPHRASE": "strongpassword",
-
-    # Enterprise / RADIUS defaults
     "RADIUS_ADDR": "127.0.0.1",
     "RADIUS_PORT": 1812,
     "RADIUS_SECRET": "mysecret",
     "RADIUS_CA": "/etc/hostapd/certs/ca.pem",
     "RADIUS_SERVER_CERT": "/etc/hostapd/certs/server.pem",
     "RADIUS_SERVER_KEY": "/etc/hostapd/certs/server.key",
-
-    # STA EAP-TLS defaults
     "EAP_CA": "/etc/freeradius/3.0/certs/ca.pem",
     "EAP_CLIENT_CERT": "/etc/freeradius/3.0/certs/client.pem",
     "EAP_CLIENT_KEY": "/etc/freeradius/3.0/certs/client.key",
@@ -44,68 +34,88 @@ SECURITY_MODES = {
     "wpa3-enterprise",
 }
 
-# =========================
-# Security helpers
-# =========================
+
+def resolve_base_dir(base_dir: str | Path | None = None) -> Path:
+    return Path(".") if base_dir is None else Path(base_dir)
+
+
+def configs_dir(base_dir: str | Path | None = None) -> Path:
+    return resolve_base_dir(base_dir) / "configs"
+
+
+def scripts_dir(base_dir: str | Path | None = None) -> Path:
+    return resolve_base_dir(base_dir) / "scripts"
+
+
+def generated_script_path(base_dir: str | Path | None = None) -> Path:
+    return resolve_base_dir(base_dir) / "generated_script.sh"
+
+
+def hostapd_conf_path(iface: str, base_dir: str | Path | None = None) -> Path:
+    return configs_dir(base_dir) / f"hostapd_{iface}.conf"
+
+
+def wpa_conf_path(iface: str, base_dir: str | Path | None = None) -> Path:
+    return configs_dir(base_dir) / f"wpa_supplicant_{iface}.conf"
+
+
+def manifest_path(base_dir: str | Path | None = None) -> Path:
+    return scripts_dir(base_dir) / "manifest.json"
+
+
+def wlan_tools_path(base_dir: str | Path | None = None) -> Path:
+    return scripts_dir(base_dir) / "wlan-tools.sh"
+
+
+def ensure_output_dirs(base_dir: str | Path | None = None) -> None:
+    configs_dir(base_dir).mkdir(parents=True, exist_ok=True)
+    scripts_dir(base_dir).mkdir(parents=True, exist_ok=True)
+
+
+def reset_output_dir(base_dir: str | Path) -> None:
+    base = resolve_base_dir(base_dir)
+    if base.exists():
+        shutil.rmtree(base)
+    ensure_output_dirs(base)
+
 
 def normalize_security_mode(raw: str | None) -> str:
-    """
-    Normalize UI / description security text to one of:
-      open, wpa2-psk, wpa3-sae, wpa2-enterprise, wpa3-enterprise
-    """
     if not raw:
         return "wpa2-psk"
-    s = raw.strip().lower()
 
+    s = raw.strip().lower()
     if s in SECURITY_MODES:
         return s
-
     if "open" in s:
         return "open"
-
     if "enterprise" in s:
-        if "wpa3" in s or "3" in s:
-            return "wpa3-enterprise"
-        return "wpa2-enterprise"
-
+        return "wpa3-enterprise" if ("wpa3" in s or "3" in s) else "wpa2-enterprise"
     if "wpa3" in s or "sae" in s:
         return "wpa3-sae"
-
     if "wpa2" in s or "psk" in s:
         return "wpa2-psk"
-
     return "wpa2-psk"
 
 
 def norm_security(sec: str) -> str:
-    """
-    Older generator's normalization (for hostapd/wpa_supp configs).
-    Accepts our 'security_mode' and maps to the older set.
-    """
     s = (sec or "").strip().lower()
     mapping = {
         "": "open",
         "open": "open",
         "none": "open",
-
         "wpa": "wpa-psk",
         "wpa-psk": "wpa-psk",
         "wpa1": "wpa-psk",
-
         "wpa2": "wpa2-psk",
         "wpa2-psk": "wpa2-psk",
         "rsn": "wpa2-psk",
-
         "wpa3": "wpa3-sae",
         "wpa3-sae": "wpa3-sae",
         "sae": "wpa3-sae",
-
         "wpa2/wpa3": "mixed-psk",
         "wpa3/wpa2": "mixed-psk",
         "sae-mixed": "mixed-psk",
         "wpa2-wpa3": "mixed-psk",
-
-        # Enterprise families
         "enterprise": "wpa2-enterprise",
         "wpa-enterprise": "wpa2-enterprise",
         "wpa2-enterprise": "wpa2-enterprise",
@@ -118,8 +128,7 @@ def norm_security(sec: str) -> str:
 
 
 def is_enterprise(sec: str) -> bool:
-    ns = norm_security(sec)
-    return ns in ("wpa2-enterprise", "wpa3-enterprise")
+    return norm_security(sec) in ("wpa2-enterprise", "wpa3-enterprise")
 
 
 def hw_mode_and_channel(band: str, channel: int):
@@ -128,21 +137,8 @@ def hw_mode_and_channel(band: str, channel: int):
         return "a", channel if channel else DEFAULTS["CHANNEL_5G"]
     return "g", channel if channel else DEFAULTS["CHANNEL_2G"]
 
-# =========================
-# NEW: Description validation
-# =========================
 
 def validate_description(desc: str) -> list[str]:
-    """
-    Server-side validation of the structured description (step 2).
-    Checks:
-    - At least one AP block
-    - Each AP has Band / Channel / Stations / Security
-    - Stations >= 1
-    - WPA2/WPA3-Personal: Passphrase length 8–63
-    - WPA2/WPA3-Enterprise: requires RADIUS block
-    - 2.4 vs 5 GHz channel sanity
-    """
     errors: list[str] = []
     text = desc.replace("\r", "")
 
@@ -152,14 +148,23 @@ def validate_description(desc: str) -> list[str]:
     )
     ap_matches = list(ap_block_pattern.finditer(text))
     if not ap_matches:
-        errors.append("No AP blocks found. Add blocks like:\nAP 1:\n  SSID: ...\n  Band: 2.4 GHz\n  Channel: 6\n  Security: ...\n  Passphrase: ...\n  Stations: 2")
+        errors.append(
+            "No AP blocks found. Add blocks like:\n"
+            "AP 1:\n"
+            "  SSID: ...\n"
+            "  Band: 2.4 GHz\n"
+            "  Channel: 6\n"
+            "  Security: ...\n"
+            "  Passphrase: ...\n"
+            "  Stations: 2"
+        )
         return errors
 
     has_radius = bool(re.search(r"^\s*RADIUS\s*:", text, re.M | re.I))
 
-    for m in ap_matches:
-        ap_num = m.group(1)
-        block = m.group(2)
+    for match in ap_matches:
+        ap_num = match.group(1)
+        block = match.group(2)
 
         band_match = re.search(r"Band\s*:\s*(.+)", block, re.I)
         band_text = band_match.group(1).strip().lower() if band_match else None
@@ -178,7 +183,6 @@ def validate_description(desc: str) -> list[str]:
         passphrase = pass_match.group(1).strip() if pass_match else None
         has_passphrase = passphrase is not None
 
-        # Required fields
         if band_text is None:
             errors.append(f"AP {ap_num}: Missing 'Band:' line.")
         if channel is None:
@@ -188,12 +192,12 @@ def validate_description(desc: str) -> list[str]:
         elif stations < 1:
             errors.append(f"AP {ap_num}: Stations is {stations}. It should be at least 1.")
 
+        canon = None
         if security is None:
             errors.append(
                 f"AP {ap_num}: Missing 'Security:' line. "
                 "Use one of: open, wpa2-psk, wpa3-sae, wpa2-enterprise, wpa3-enterprise."
             )
-            canon = None
         else:
             canon = normalize_security_mode(security)
             if canon not in SECURITY_MODES:
@@ -202,12 +206,9 @@ def validate_description(desc: str) -> list[str]:
                     "Allowed: open, wpa2-psk, wpa3-sae, wpa2-enterprise, wpa3-enterprise."
                 )
 
-        # Personal modes: must have passphrase 8–63
         if canon in ("wpa2-psk", "wpa3-sae"):
             if not has_passphrase:
-                errors.append(
-                    f"AP {ap_num}: Security is {canon} but no 'Passphrase:' is set."
-                )
+                errors.append(f"AP {ap_num}: Security is {canon} but no 'Passphrase:' is set.")
             else:
                 length = len(passphrase)
                 if length < 8 or length > 63:
@@ -216,13 +217,9 @@ def validate_description(desc: str) -> list[str]:
                         "For WPA2/WPA3-Personal it must be between 8 and 63 characters."
                     )
 
-        # Enterprise: require RADIUS
         if canon in ("wpa2-enterprise", "wpa3-enterprise") and not has_radius:
-            errors.append(
-                f"AP {ap_num}: Security is {canon} but no 'RADIUS:' block is defined."
-            )
+            errors.append(f"AP {ap_num}: Security is {canon} but no 'RADIUS:' block is defined.")
 
-        # Band/channel sanity
         if band_text and channel is not None:
             is_24 = "2.4" in band_text or "2g" in band_text
             is_5 = "5" in band_text
@@ -237,55 +234,35 @@ def validate_description(desc: str) -> list[str]:
 
     return errors
 
-# =========================
-# NEW: Parse structured description → topology
-# =========================
 
-def parse_description(desc: str):
-    """
-    Parse your step-2 structured text into a 'topology' dict:
-
-    {
-      "country": "GR",
-      "aps": [
-        {
-          "id": "ap1",
-          "ssid": "...",
-          "band": "2g" | "5g",
-          "channel": 6,
-          "security_mode": "wpa2-psk",
-          "passphrase": "...",
-          "stas": ["sta1_0", "sta1_1"],
-          "radius": { "addr": ..., "port": ..., "shared_secret": ... }   # optional
-        },
-        ...
-      ]
-    }
-    """
+def parse_description(desc: str) -> dict[str, Any]:
     text = desc.replace("\r", "")
     lines = text.splitlines()
 
-    # Country
     country = DEFAULTS["COUNTRY"]
     for line in lines:
-        m = re.match(r"\s*Country\s*:\s*(\S+)", line, re.I)
-        if m:
-            country = m.group(1).upper()
+        match = re.match(r"\s*Country\s*:\s*(\S+)", line, re.I)
+        if match:
+            country = match.group(1).upper()
             break
 
-    # RADIUS block (optional, shared)
     radius = None
     radius_match = re.search(r"RADIUS\s*:\s*(.*)", text, flags=re.I | re.S)
     if radius_match:
         radius_block = text[radius_match.start():]
         radius_lines = radius_block.splitlines()
-        r_addr = r_port = r_secret = None
+
+        r_addr = None
+        r_port = None
+        r_secret = None
+
         for line in radius_lines[1:]:
             if re.match(r"^\s*AP\s+\d+:", line):
                 break
             m_addr = re.match(r"\s*Address\s*:\s*(.+)", line, re.I)
             m_port = re.match(r"\s*Port\s*:\s*(\d+)", line, re.I)
             m_sec = re.match(r"\s*Shared\s+secret\s*:\s*\"?(.+?)\"?\s*$", line, re.I)
+
             if m_addr:
                 r_addr = m_addr.group(1).strip()
             if m_port:
@@ -300,12 +277,11 @@ def parse_description(desc: str):
                 "shared_secret": r_secret or DEFAULTS["RADIUS_SECRET"],
             }
 
-    # AP blocks
     aps = []
     ap_iter = list(re.finditer(r"^AP\s+(\d+):", text, flags=re.I | re.M))
-    for idx, m in enumerate(ap_iter):
-        num = int(m.group(1))
-        start = m.start()
+    for idx, match in enumerate(ap_iter):
+        num = int(match.group(1))
+        start = match.start()
         if idx + 1 < len(ap_iter):
             end = ap_iter[idx + 1].start()
         else:
@@ -314,10 +290,7 @@ def parse_description(desc: str):
         block = text[start:end]
         aps.append(parse_ap_block(num, block, radius))
 
-    return {
-        "country": country,
-        "aps": aps,
-    }
+    return {"country": country, "aps": aps}
 
 
 def parse_ap_block(num: int, block: str, radius: dict | None):
@@ -355,8 +328,6 @@ def parse_ap_block(num: int, block: str, radius: dict | None):
         if m_sta:
             stations = int(m_sta.group(1))
 
-    stas = [f"sta{num}_{i}" for i in range(stations)]
-
     ap = {
         "id": f"ap{num}",
         "ssid": ssid,
@@ -364,7 +335,7 @@ def parse_ap_block(num: int, block: str, radius: dict | None):
         "channel": channel,
         "security_mode": security_mode,
         "passphrase": passphrase,
-        "stas": stas,
+        "stas": [f"sta{num}_{i}" for i in range(stations)],
     }
 
     if security_mode in ("wpa2-enterprise", "wpa3-enterprise") and radius:
@@ -372,40 +343,16 @@ def parse_ap_block(num: int, block: str, radius: dict | None):
 
     return ap
 
-# =========================
-# ADAPTER: topology -> old 'parsed' structure
-# =========================
 
-def topology_to_parsed(topology: dict) -> dict:
-    """
-    Convert our 'topology' to the structure used by the old generator:
-
-    parsed = {
-      "aps": [
-        {
-          "id": "ap1",
-          "ssid": "...",
-          "security": "wpa2-psk",
-          "passphrase": "...",
-          "country": "US",
-          "band": "2g",
-          "channel": 6,
-          "channel_width": 20,
-          "radius": {...},
-          "stas": ["sta1_0", "sta1_1"],
-        },
-        ...
-      ]
-    }
-    """
+def topology_to_parsed(topology: dict[str, Any]) -> dict[str, Any]:
     country = topology.get("country", DEFAULTS["COUNTRY"])
     parsed_aps = []
+
     for ap in topology["aps"]:
-        sec = ap.get("security_mode", "wpa2-psk")
         ap_obj = {
             "id": ap["id"],
             "ssid": ap["ssid"],
-            "security": sec,
+            "security": ap.get("security_mode", "wpa2-psk"),
             "passphrase": ap.get("passphrase", DEFAULTS["PASSPHRASE"]),
             "country": country,
             "band": ap.get("band", DEFAULTS["BAND"]),
@@ -419,39 +366,23 @@ def topology_to_parsed(topology: dict) -> dict:
 
     return {"aps": parsed_aps}
 
-# =========================
-# Interface allocation (old model)
-# =========================
 
-def allocate_interfaces(parsed: dict):
-    """
-    APs first, then each AP's STAs → stable wlan numbering and AP binding.
-    Returns list of (iface_name, role, ap_obj).
-    role ∈ {"ap", "sta"}
-    """
+def allocate_interfaces(parsed: dict[str, Any]):
     interfaces = []
     idx = 0
     for ap in parsed["aps"]:
-        iface_ap = f"wlan{idx}"; idx += 1
+        iface_ap = f"wlan{idx}"
+        idx += 1
         interfaces.append((iface_ap, "ap", ap))
-        stas = ap.get("stas", [])
-        for _ in stas:
-            iface_sta = f"wlan{idx}"; idx += 1
+        for _ in ap.get("stas", []):
+            iface_sta = f"wlan{idx}"
+            idx += 1
             interfaces.append((iface_sta, "sta", ap))
     return interfaces
 
-# =========================
-# Enterprise bootstrap (FreeRADIUS + certs) – unchanged from previous.py
-# =========================
 
 def ensure_enterprise_radius(secret: str = DEFAULTS["RADIUS_SECRET"]):
-    """
-    Ensure FreeRADIUS is installed, certs generated, symlinks to /etc/hostapd/certs exist,
-    localhost client exists with the given secret, and service is running.
-    Uses sudo; requires appropriate privileges.
-    """
     try:
-        # 1) Install freeradius if missing
         subprocess.run(
             [
                 "bash",
@@ -462,7 +393,6 @@ def ensure_enterprise_radius(secret: str = DEFAULTS["RADIUS_SECRET"]):
             check=False,
         )
 
-        # 2) Generate certs with Makefile
         cmds = [
             "set -e",
             "cd /etc/freeradius/3.0/certs",
@@ -471,7 +401,6 @@ def ensure_enterprise_radius(secret: str = DEFAULTS["RADIUS_SECRET"]):
         ]
         subprocess.run(["bash", "-lc", " ; ".join(cmds)], check=True)
 
-        # 3) Symlink certs for hostapd
         subprocess.run(
             [
                 "bash",
@@ -484,7 +413,6 @@ def ensure_enterprise_radius(secret: str = DEFAULTS["RADIUS_SECRET"]):
             check=True,
         )
 
-        # 4) Ensure localhost client with secret
         clients_file = "/etc/freeradius/3.0/clients.conf"
         awk_cmd = (
             r"""sudo awk -v secret='""" + secret + r"""' '
@@ -503,13 +431,12 @@ END {
 }' """ + clients_file + r""" > /tmp/clients.conf.tmp && sudo mv /tmp/clients.conf.tmp """ + clients_file
         )
         subprocess.run(["bash", "-lc", awk_cmd], check=True)
-        
-                # 4b) Ensure a lab user 'user1' with password 'password1'
+
         users_file = "/etc/freeradius/3.0/mods-config/files/authorize"
         awk_users = (
             r"""sudo awk '
 BEGIN { found=0 }
-^\s*user1\s/ {{ found=1 }}
+^\s*user1\s/ { found=1 }
 { print }
 END {
   if (!found) {
@@ -520,21 +447,16 @@ END {
         )
         subprocess.run(["bash", "-lc", awk_users], check=True)
 
-        # 5) Enable & restart radius
         subprocess.run(
             ["bash", "-lc", "sudo systemctl enable --now freeradius && sudo systemctl restart freeradius"],
             check=True,
         )
-
         print("[radius] bootstrap complete.")
-    except Exception as e:
-        print(f"[radius] bootstrap error: {e}")
+    except Exception as exc:
+        print(f"[radius] bootstrap error: {exc}")
 
-# =========================
-# Config generation (old, slightly adapted)
-# =========================
 
-def hostapd_conf_for(iface: str, ap: dict) -> str:
+def hostapd_conf_for(iface: str, ap: dict[str, Any]) -> str:
     ssid = ap.get("ssid", iface)
     sec = norm_security(ap.get("security", "open"))
     passphrase = ap.get("passphrase", DEFAULTS["PASSPHRASE"])
@@ -553,20 +475,16 @@ def hostapd_conf_for(iface: str, ap: dict) -> str:
         "ieee80211n=1",
     ]
     if hw_mode == "a" and channel_width >= 40:
-        lines += ["ieee80211ac=1"]
+        lines.append("ieee80211ac=1")
 
     if sec == "open":
         lines += ["auth_algs=1", "wpa=0"]
-
     elif sec == "wpa-psk":
         lines += ["wpa=1", "wpa_key_mgmt=WPA-PSK", f"wpa_passphrase={passphrase}", "wpa_pairwise=TKIP CCMP"]
-
     elif sec == "wpa2-psk":
         lines += ["wpa=2", "wpa_key_mgmt=WPA-PSK", f"wpa_passphrase={passphrase}", "rsn_pairwise=CCMP"]
-
     elif sec == "wpa3-sae":
         lines += ["wpa=2", "wpa_key_mgmt=SAE", "ieee80211w=2", f"sae_password={passphrase}", "rsn_pairwise=CCMP"]
-
     elif sec == "mixed-psk":
         lines += [
             "wpa=2",
@@ -576,9 +494,7 @@ def hostapd_conf_for(iface: str, ap: dict) -> str:
             f"wpa_passphrase={passphrase}",
             "rsn_pairwise=CCMP",
         ]
-
     elif sec in ("wpa2-enterprise", "wpa3-enterprise"):
-        # External RADIUS server on localhost, hostapd is just the authenticator.
         radius = ap.get("radius", {}) or {}
         r_addr = radius.get("addr", DEFAULTS["RADIUS_ADDR"])
         r_port = int(radius.get("port", DEFAULTS["RADIUS_PORT"]))
@@ -594,14 +510,8 @@ def hostapd_conf_for(iface: str, ap: dict) -> str:
             f"auth_server_shared_secret={r_secret}",
             "eapol_key_index_workaround=0",
         ]
-        # WPA3-Enterprise requires PMF; WPA2-Enterprise can use optional PMF.
-        if sec == "wpa3-enterprise":
-            lines.append("ieee80211w=2")
-        else:
-            lines.append("ieee80211w=1")
-
+        lines.append("ieee80211w=2" if sec == "wpa3-enterprise" else "ieee80211w=1")
     else:
-        # Fallback to WPA2-PSK
         lines += ["wpa=2", "wpa_key_mgmt=WPA-PSK", f"wpa_passphrase={passphrase}", "rsn_pairwise=CCMP"]
 
     return "\n".join(lines) + "\n"
@@ -617,6 +527,7 @@ def wpa_supplicant_conf_psk(country: str, ssid: str, sec: str, passphrase: str) 
         f'    ssid="{ssid}"',
     ]
     s = norm_security(sec)
+
     if s == "open":
         body = ["    key_mgmt=NONE"]
     elif s == "wpa-psk":
@@ -629,18 +540,12 @@ def wpa_supplicant_conf_psk(country: str, ssid: str, sec: str, passphrase: str) 
         body = [f'    psk="{passphrase}"', "    key_mgmt=SAE WPA-PSK", "    ieee80211w=1", "    pairwise=CCMP", "    group=CCMP"]
     else:
         body = [f'    psk="{passphrase}"', "    key_mgmt=WPA-PSK", "    proto=RSN", "    pairwise=CCMP", "    group=CCMP"]
-    tail = ["}"]
-    return "\n".join(head + body + tail) + "\n"
+
+    return "\n".join(head + body + ["}"]) + "\n"
 
 
 def wpa_supplicant_conf_enterprise(country: str, ssid: str, identity: str = "user1") -> str:
-    """
-    EAP-PEAP/MSCHAPv2 profile for lab use.
-    Works with a simple FreeRADIUS user:
-        user1 Cleartext-Password := "password1"
-    created by ensure_enterprise_radius().
-    """
-    lines = [
+    return "\n".join([
         "ctrl_interface=/var/run/wpa_supplicant_testbed",
         "update_config=1",
         f"country={country}",
@@ -649,26 +554,17 @@ def wpa_supplicant_conf_enterprise(country: str, ssid: str, identity: str = "use
         f'    ssid="{ssid}"',
         "    key_mgmt=WPA-EAP",
         "    eap=PEAP",
-        f'    identity="user1"',
-        f'    password="password1"',
+        '    identity="user1"',
+        '    password="password1"',
         f'    ca_cert="{DEFAULTS["EAP_CA"]}"',
         '    phase1="peapver=0"',
         '    phase2="auth=MSCHAPV2"',
         "}",
-    ]
-    return "\n".join(lines) + "\n"
+    ]) + "\n"
 
 
-def hostapd_conf_path(iface: str) -> Path:
-    return Path(f"configs/hostapd_{iface}.conf")
-
-
-def wpa_conf_path(iface: str) -> Path:
-    return Path(f"configs/wpa_supplicant_{iface}.conf")
-
-
-def save_configs(interfaces, parsed):
-    os.makedirs("configs", exist_ok=True)
+def save_configs(interfaces, parsed, base_dir: str | Path | None = None):
+    ensure_output_dirs(base_dir)
 
     any_ent = any(is_enterprise(ap.get("security", "")) for _, role, ap in interfaces if role == "ap")
     if any_ent:
@@ -677,7 +573,7 @@ def save_configs(interfaces, parsed):
     ent_sta_counter = 0
     for iface, role, ap in interfaces:
         if role == "ap":
-            hostapd_conf_path(iface).write_text(hostapd_conf_for(iface, ap))
+            hostapd_conf_path(iface, base_dir).write_text(hostapd_conf_for(iface, ap))
         else:
             sec = ap.get("security", "open")
             country = ap.get("country", DEFAULTS["COUNTRY"])
@@ -686,18 +582,15 @@ def save_configs(interfaces, parsed):
             if is_enterprise(sec):
                 ident = f'{DEFAULTS["EAP_IDENTITY_PREFIX"]}{ent_sta_counter}'
                 ent_sta_counter += 1
-                wpa_conf_path(iface).write_text(
+                wpa_conf_path(iface, base_dir).write_text(
                     wpa_supplicant_conf_enterprise(country, ssid, ident)
                 )
             else:
                 passphrase = ap.get("passphrase", DEFAULTS["PASSPHRASE"])
-                wpa_conf_path(iface).write_text(
+                wpa_conf_path(iface, base_dir).write_text(
                     wpa_supplicant_conf_psk(country, ssid, sec, passphrase)
                 )
 
-# =========================
-# Per-role scripts (AP / STA) – from previous.py, slightly tweaked
-# =========================
 
 def ap_script_text(iface: str, ap_ip_cidr: str, dhcp_range: str) -> str:
     return f"""#!/usr/bin/env bash
@@ -714,21 +607,18 @@ wait_for_iface() {{
 }}
 wait_for_iface
 
-# cleanup
-pkill -x hostapd   >/dev/null 2>&1 || true
-pkill -x dnsmasq   >/dev/null 2>&1 || true
+rfkill unblock all >/dev/null 2>&1 || true
+pkill -x hostapd >/dev/null 2>&1 || true
+pkill -x dnsmasq >/dev/null 2>&1 || true
 dhclient -r "$AP_IF" >/dev/null 2>&1 || true
 
-# prepare
 ip link set "$AP_IF" down || true
 iw dev "$AP_IF" set type __ap || true
 ip link set "$AP_IF" up || true
 
-# address
 ip addr flush dev "$AP_IF" || true
 ip addr add "$AP_IP_CIDR" dev "$AP_IF" || true
 
-# hostapd (retry)
 tries=0
 until hostapd "$HOSTAPD_CONF" -B; do
   tries=$((tries+1)); [ $tries -ge 3 ] && {{ log "hostapd failed"; exit 1; }}
@@ -736,22 +626,20 @@ until hostapd "$HOSTAPD_CONF" -B; do
 done
 log "hostapd started"
 
-# dnsmasq (per-AP)
 dnsmasq --interface="$AP_IF" --bind-interfaces --except-interface=lo \\
   --dhcp-range="{dhcp_range}" --dhcp-option=3,"$AP_IP" --dhcp-option=6,1.1.1.1,8.8.8.8 --no-hosts || true
 
-# status
 iw dev "$AP_IF" info || true
 """
 
 
-def sta_script_text(iface: str, ssid: str, psk: str, wpa_conf_path: str) -> str:
+def sta_script_text(iface: str, ssid: str, psk: str, wpa_config_path: str) -> str:
     return f"""#!/usr/bin/env bash
 set -euo pipefail
 STA_IF="{iface}"
 SSID="{ssid}"
 PSK="{psk}"
-WPA_CONF="{wpa_conf_path}"
+WPA_CONF="{wpa_config_path}"
 log() {{ echo "[STA:{iface}] $1"; }}
 wait_for_iface() {{
   for i in $(seq 1 80); do ip link show "{iface}" >/dev/null 2>&1 && return 0; sleep 0.25; done
@@ -759,18 +647,16 @@ wait_for_iface() {{
 }}
 wait_for_iface
 
-# cleanup
+rfkill unblock all >/dev/null 2>&1 || true
 pkill -x wpa_supplicant >/dev/null 2>&1 || true
-dhclient -r "$STA_IF"   >/dev/null 2>&1 || true
+dhclient -r "$STA_IF" >/dev/null 2>&1 || true
 rm -rf /var/run/wpa_supplicant_testbed 2>/dev/null || true
 mkdir -p /var/run/wpa_supplicant_testbed
 
-# prepare
 ip link set "$STA_IF" down || true
 iw dev "$STA_IF" set type managed 2>/dev/null || iw dev "$STA_IF" set type station || true
 ip link set "$STA_IF" up || true
 
-# wpa_supplicant (retry)
 tries=0
 until wpa_supplicant -i "$STA_IF" -c "$WPA_CONF" -B; do
   tries=$((tries+1)); [ $tries -ge 3 ] && {{ log "wpa_supplicant failed"; exit 1; }}
@@ -778,74 +664,67 @@ until wpa_supplicant -i "$STA_IF" -c "$WPA_CONF" -B; do
 done
 log "wpa_supplicant started"
 
-# wait for association
 for i in $(seq 1 30); do
   iw dev "$STA_IF" link | grep -q '^Connected' && break
   [ $i -eq 30 ] && {{ log "no association"; exit 1; }}
   sleep 0.5
 done
 
-# DHCP
 dhclient -v "$STA_IF" || true
 
-# status
 iw dev "$STA_IF" link || true
 ip -4 addr show "$STA_IF" | sed 's/^/  /' || true
 """
 
-def generate_role_scripts(interfaces):
-    """
-    For each iface, generate AP / STA scripts that will be executed inside namespaces.
-    """
-    os.makedirs("scripts", exist_ok=True)
+
+def generate_role_scripts(interfaces, base_dir: str | Path | None = None):
+    ensure_output_dirs(base_dir)
 
     subnet_base = 10
     ap_index = 0
 
     for iface, role, ap in interfaces:
         if role == "ap":
-            # 10.0.10.1/24, 10.0.11.1/24, ...
             cidr = f"10.0.{subnet_base + ap_index}.1/24"
             dhcp_range = f"10.0.{subnet_base + ap_index}.50,10.0.{subnet_base + ap_index}.150,12h"
             ap_index += 1
             content = ap_script_text(iface, cidr, dhcp_range)
-            out = Path(f"scripts/ap_{iface}.sh")
+            out = scripts_dir(base_dir) / f"ap_{iface}.sh"
         else:
             ssid = ap.get("ssid", f"{iface}_ssid")
             sec = ap.get("security", "open")
             psk = "" if is_enterprise(sec) or norm_security(sec) == "open" else ap.get("passphrase", DEFAULTS["PASSPHRASE"])
             content = sta_script_text(iface, ssid, psk, f"configs/wpa_supplicant_{iface}.conf")
-            out = Path(f"scripts/sta_{iface}.sh")
+            out = scripts_dir(base_dir) / f"sta_{iface}.sh"
 
         out.write_text(content)
         os.chmod(out, 0o755)
 
-# =========================
-# Manifest + tools + dnsmasq (from previous.py)
-# =========================
 
-def write_manifest(interfaces):
-    os.makedirs("scripts", exist_ok=True)
-    data = {
+def build_manifest(interfaces) -> dict[str, Any]:
+    return {
         "namespaces": {"ap": "ns-ap", "sta": "ns-sta"},
         "aps": [{"iface": iface, "ns": "ns-ap"} for iface, role, _ in interfaces if role == "ap"],
         "stas": [{"iface": iface, "ns": "ns-sta"} for iface, role, _ in interfaces if role == "sta"],
     }
-    Path("scripts/manifest.json").write_text(json.dumps(data, indent=2))
 
 
-def write_wlan_tools():
+def write_manifest(interfaces, base_dir: str | Path | None = None) -> dict[str, Any]:
+    ensure_output_dirs(base_dir)
+    data = build_manifest(interfaces)
+    manifest_path(base_dir).write_text(json.dumps(data, indent=2))
+    return data
+
+
+def write_wlan_tools(base_dir: str | Path | None = None):
+    ensure_output_dirs(base_dir)
+
     tools = r'''#!/usr/bin/env bash
 set -euo pipefail
 
-MANIFEST="scripts/manifest.json"
-
-need() { command -v "$1" >/dev/null 2>&1 || { echo "Missing: $1"; exit 1; }; }
-for bin in ip iw jq; do need "$bin"; end;'''  # We'll correct tools below
-    # To keep it simple and avoid syntax mistakes, we'll write the original content:
-
-    tools = r'''#!/usr/bin/env bash
-set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ARTIFACT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$ARTIFACT_DIR"
 
 MANIFEST="scripts/manifest.json"
 
@@ -879,7 +758,7 @@ status() {
     echo
   done
   echo "== Neighbors =="
-  for i in "${AP_IFS[@]}";  do ns_exec ap  ip neigh show dev "$i" || true; done
+  for i in "${AP_IFS[@]}"; do ns_exec ap ip neigh show dev "$i" || true; done
   for i in "${STA_IFS[@]}"; do ns_exec sta ip neigh show dev "$i" || true; done
 }
 
@@ -890,10 +769,10 @@ logs() {
 cleanup() {
   echo "Stopping wpa_supplicant / hostapd / dnsmasq ..."
   ns_exec sta pkill -x wpa_supplicant || true
-  ns_exec ap  pkill -x hostapd       || true
-  ns_exec ap  pkill -x dnsmasq       || true
+  ns_exec ap pkill -x hostapd || true
+  ns_exec ap pkill -x dnsmasq || true
   for i in "${STA_IFS[@]}"; do ns_exec sta dhclient -r "$i" 2>/dev/null || true; done
-  for i in "${AP_IFS[@]}";  do ns_exec ap  ip addr flush dev "$i" || true; done
+  for i in "${AP_IFS[@]}"; do ns_exec ap ip addr flush dev "$i" || true; done
   for i in "${STA_IFS[@]}"; do ns_exec sta ip addr flush dev "$i" || true; done
 }
 
@@ -902,10 +781,11 @@ hard-reset() {
   echo "Reloading mac80211_hwsim ..."
   sudo modprobe -r mac80211_hwsim || true
   sudo modprobe mac80211_hwsim || true
+  sudo rfkill unblock all || true
+  sleep 1
 }
 
 ping-ap() {
-  # Ping AP IP from each STA
   for ai in "${AP_IFS[@]}"; do
     AP_IP=$(ns_exec ap ip -4 addr show "$ai" | awk "/inet /{print \$2}" | cut -d/ -f1 | head -n1)
     [ -z "$AP_IP" ] && continue
@@ -917,7 +797,6 @@ ping-ap() {
 }
 
 ping-sta() {
-  # Ping each STA IP from AP namespace
   for si in "${STA_IFS[@]}"; do
     STA_IP=$(ns_exec sta ip -4 addr show "$si" | awk "/inet /{print \$2}" | cut -d/ -f1 | head -n1)
     [ -z "$STA_IP" ] && continue
@@ -927,7 +806,6 @@ ping-sta() {
 }
 
 capture() {
-  # capture <ap|sta> <iface> <outfile.pcap>
   role="${1:-}"; iface="${2:-}"; out="${3:-capture.pcap}"
   [ -z "$role" ] || [ -z "$iface" ] && { echo "Usage: $0 capture <ap|sta> <iface> <outfile.pcap>"; exit 1; }
   ns="$AP_NS"; [ "$role" = "sta" ] && ns="$STA_NS"
@@ -953,7 +831,7 @@ fix-arp() {
 
 arpshow() {
   echo "AP ns:"
-  ns_exec ap  ip neigh || true
+  ns_exec ap ip neigh || true
   echo "STA ns:"
   ns_exec sta ip neigh || true
 }
@@ -975,14 +853,13 @@ case "$cmd" in
   *) usage; exit 1;;
 esac
 '''
-    os.makedirs("scripts", exist_ok=True)
-    p = Path("scripts/wlan-tools.sh")
+    p = wlan_tools_path(base_dir)
     p.write_text(tools)
     os.chmod(p, 0o755)
 
 
-def generate_central_dnsmasq_config(interfaces):
-    os.makedirs("configs", exist_ok=True)
+def generate_central_dnsmasq_config(interfaces, base_dir: str | Path | None = None):
+    ensure_output_dirs(base_dir)
     subnet_base = 10
     ap_count = 0
     lines = [
@@ -992,7 +869,7 @@ def generate_central_dnsmasq_config(interfaces):
         "server=8.8.8.8",
         "bind-interfaces",
     ]
-    for iface, role, ap in interfaces:
+    for iface, role, _ in interfaces:
         if role != "ap":
             continue
         subnet_id = subnet_base + ap_count
@@ -1003,20 +880,12 @@ def generate_central_dnsmasq_config(interfaces):
             f"dhcp-range=10.0.{subnet_id}.50,10.0.{subnet_id}.150,12h",
         ]
         ap_count += 1
-    Path("configs/dnsmasq.conf").write_text("\n".join(lines) + "\n")
+    (configs_dir(base_dir) / "dnsmasq.conf").write_text("\n".join(lines) + "\n")
 
-# =========================
-# Master script: namespaces + PHY moving (old working logic)
-# =========================
 
-def generate_shell_script(parsed, interfaces):
-    """
-    Namespace + PHY-aware orchestrator:
-      - (re)load mac80211_hwsim with needed radios
-      - create ns-ap / ns-sta
-      - move PHY to ns, recreate wlanX in ns
-      - assign AP IPs, launch per-role scripts
-    """
+def generate_shell_script(parsed, interfaces, base_dir: str | Path | None = None) -> str:
+    ensure_output_dirs(base_dir)
+
     radios = len(parsed["aps"]) + sum(len(ap.get("stas", [])) for ap in parsed["aps"])
     ap_ifaces = [iface for iface, role, _ in interfaces if role == "ap"]
     sta_ifaces = [iface for iface, role, _ in interfaces if role == "sta"]
@@ -1024,10 +893,14 @@ def generate_shell_script(parsed, interfaces):
     lines = [
         "#!/usr/bin/env bash",
         "set -euo pipefail",
+        'SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"',
+        'cd "$SCRIPT_DIR"',
         "",
         "# --- (re)load hwsim with proper radio count ---",
         "sudo modprobe -r mac80211_hwsim 2>/dev/null || true",
         f"sudo modprobe mac80211_hwsim radios={radios}",
+        "sudo rfkill unblock all || true",
+        "sleep 1",
         "",
         "# --- wait for wlan* to appear in root ns ---",
         f"want={radios}",
@@ -1058,6 +931,7 @@ def generate_shell_script(parsed, interfaces):
         "  ns=\"$1\"; name=\"$2\"; type=\"$3\";",
         "  sudo ip netns exec \"$ns\" bash -lc '",
         "    set -e",
+        "    rfkill unblock all >/dev/null 2>&1 || true",
         "    ip link set '\"$name\"' down 2>/dev/null || true",
         "    iw dev '\"$name\"' del 2>/dev/null || true",
         "    P=\"$(iw phy | sed -n \"s/^Wiphy //p\" | head -n1)\"",
@@ -1089,7 +963,8 @@ def generate_shell_script(parsed, interfaces):
         "",
         "# --- bring interfaces up inside ns (skip lo) ---",
         "for n in ns-ap ns-sta; do",
-        "  for i in $(sudo ip netns exec \"$n\" bash -lc \"ls /sys/class/net | grep -v '^lo$\") ; do",
+        "  sudo ip netns exec \"$n\" rfkill unblock all >/dev/null 2>&1 || true",
+        "  for i in $(sudo ip netns exec \"$n\" bash -lc \"ls /sys/class/net | grep -v '^lo$'\") ; do",
         "    sudo ip netns exec \"$n\" ip link set \"$i\" up 2>/dev/null || true",
         "  done",
         "done",
@@ -1106,11 +981,8 @@ def generate_shell_script(parsed, interfaces):
             lines.append(f"sudo ip netns exec ns-ap ip addr add {ip} dev {iface} 2>/dev/null || true")
             ap_count += 1
 
-    lines += [
-        "",
-        "# --- launch per-interface scripts inside namespaces ---",
-    ]
-    for iface, role, ap in interfaces:
+    lines += ["", "# --- launch per-interface scripts inside namespaces ---"]
+    for iface, role, _ in interfaces:
         ns = "ns-ap" if role == "ap" else "ns-sta"
         sh = f"./scripts/ap_{iface}.sh" if role == "ap" else f"./scripts/sta_{iface}.sh"
         lines.append(f"sudo ip netns exec {ns} {sh} &")
@@ -1122,60 +994,130 @@ def generate_shell_script(parsed, interfaces):
     ]
 
     script = "\n".join(lines) + "\n"
-    Path("generated_script.sh").write_text(script)
-    os.chmod("generated_script.sh", 0o755)
+    path = generated_script_path(base_dir)
+    path.write_text(script)
+    os.chmod(path, 0o755)
     return script
 
-# =========================
-# Flask routes
-# =========================
 
-@app.route("/", methods=["GET", "POST"])
-def index():
+def collect_rendered_configs(topology: dict[str, Any], parsed: dict[str, Any], interfaces) -> dict[str, Any]:
+    ap_cfgs: dict[str, str] = {}
+    sta_cfgs: dict[str, str] = {}
+    sta_idx_by_ap: dict[str, int] = {}
+
+    for iface, role, ap in interfaces:
+        if role == "ap":
+            ap_cfgs[ap["id"]] = hostapd_conf_for(iface, ap)
+        else:
+            ap_id = ap["id"]
+            sta_idx = sta_idx_by_ap.get(ap_id, 0)
+            sta_name = ap.get("stas", [])[sta_idx] if sta_idx < len(ap.get("stas", [])) else iface
+            sta_idx_by_ap[ap_id] = sta_idx + 1
+
+            country = ap.get("country", DEFAULTS["COUNTRY"])
+            ssid = ap.get("ssid", f"{iface}_ssid")
+            sec = ap.get("security", "open")
+
+            if is_enterprise(sec):
+                sta_cfgs[sta_name] = wpa_supplicant_conf_enterprise(
+                    country, ssid, f'{DEFAULTS["EAP_IDENTITY_PREFIX"]}{sta_idx}'
+                )
+            else:
+                passphrase = ap.get("passphrase", DEFAULTS["PASSPHRASE"])
+                sta_cfgs[sta_name] = wpa_supplicant_conf_psk(country, ssid, sec, passphrase)
+
+    return {"ap": ap_cfgs, "sta": sta_cfgs}
+
+
+def build_testbed_context(
+    description: str = "",
+    scenario: str = "",
+    base_dir: str | Path | None = None,
+    persist_files: bool = True,
+) -> dict[str, Any]:
     script = ""
     topology = None
-    description = ""
-    show_step2 = False
-    scenario = ""
+    configs = None
     errors: list[str] = []
+    show_step2 = bool(description.strip())
 
-    if request.method == "POST":
-        description = request.form.get("description", "") or ""
-        scenario = request.form.get("scenario", "") or ""
-        if description.strip():
-            show_step2 = True
-            errors = validate_description(description)
-            if not errors:
-                topology = parse_description(description)
-                parsed = topology_to_parsed(topology)
+    if description.strip():
+        errors = validate_description(description)
+        if not errors:
+            topology = parse_description(description)
+            parsed = topology_to_parsed(topology)
+            interfaces = allocate_interfaces(parsed)
 
-                # Allocate interfaces & generate everything (old working pipeline)
-                interfaces = allocate_interfaces(parsed)
-                save_configs(interfaces, parsed)
-                generate_role_scripts(interfaces)
-                generate_central_dnsmasq_config(interfaces)
-                write_manifest(interfaces)
-                write_wlan_tools()
-                script = generate_shell_script(parsed, interfaces)
+            if persist_files:
+                ensure_output_dirs(base_dir)
+                save_configs(interfaces, parsed, base_dir)
+                generate_role_scripts(interfaces, base_dir)
+                generate_central_dnsmasq_config(interfaces, base_dir)
+                write_manifest(interfaces, base_dir)
+                write_wlan_tools(base_dir)
+                script = generate_shell_script(parsed, interfaces, base_dir)
+            else:
+                script = generate_shell_script(parsed, interfaces, None)
 
-    return render_template(
-        "testbed.html",
-        script=script,
-        topology=topology,
-        description=description,
-        show_step2=show_step2,
-        scenario=scenario,
-        errors=errors,
-    )
+            configs = collect_rendered_configs(topology, parsed, interfaces)
 
-
-@app.route("/favicon.ico")
-def favicon():
-    return send_from_directory("static", "favicon.ico", mimetype="image/vnd.microsoft.icon")
+    return {
+        "script": script,
+        "topology": topology,
+        "description": description,
+        "show_step2": show_step2,
+        "scenario": scenario,
+        "errors": errors,
+        "configs": configs,
+    }
 
 
-if __name__ == "__main__":
-    Path("configs").mkdir(exist_ok=True)
-    Path("scripts").mkdir(exist_ok=True)
-    app.run(host="127.0.0.1", port=5000, debug=True)
+def build_scenario_bundle(
+    description: str,
+    scenario: str = "",
+    base_dir: str | Path | None = None,
+    reset_dir_first: bool = True,
+) -> dict[str, Any]:
+    errors = validate_description(description)
+    if errors:
+        return {
+            "ok": False,
+            "errors": errors,
+            "topology": None,
+            "parsed": None,
+            "interfaces": None,
+            "manifest": None,
+            "generated_script": "",
+            "configs": None,
+            "artifact_dir": str(resolve_base_dir(base_dir)) if base_dir else None,
+        }
 
+    topology = parse_description(description)
+    parsed = topology_to_parsed(topology)
+    interfaces = allocate_interfaces(parsed)
+
+    if base_dir is not None:
+        if reset_dir_first:
+            reset_output_dir(base_dir)
+        else:
+            ensure_output_dirs(base_dir)
+
+    save_configs(interfaces, parsed, base_dir)
+    generate_role_scripts(interfaces, base_dir)
+    generate_central_dnsmasq_config(interfaces, base_dir)
+    manifest = write_manifest(interfaces, base_dir)
+    write_wlan_tools(base_dir)
+    generated_script = generate_shell_script(parsed, interfaces, base_dir)
+    configs = collect_rendered_configs(topology, parsed, interfaces)
+
+    return {
+        "ok": True,
+        "errors": [],
+        "topology": topology,
+        "parsed": parsed,
+        "interfaces": interfaces,
+        "manifest": manifest,
+        "generated_script": generated_script,
+        "configs": configs,
+        "artifact_dir": str(resolve_base_dir(base_dir)) if base_dir else None,
+    }

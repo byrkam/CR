@@ -52,7 +52,7 @@
 {% if current_user_role == "instructor" %}
 
 <a href="{{ url_for('instructor_scenarios') }}"
-   class="nav-link {% if request.endpoint == 'instructor_scenarios' %}active{% endif %}">
+   class="nav-link {% if request.endpoint in ['instructor_scenarios', 'instructor_create_scenario', 'instructor_edit_scenario'] %}active{% endif %}">
    🛠 Scenarios
 </a>
 

@@ -1,33 +1,55 @@
 /* =====================================================
-   INSTRUCTOR PAGE LAYOUT
-   (Dashboard-focused; no admin table/reset/delete styles)
+   INSTRUCTOR UI
+   Clean cyber dashboard + scenario management styles
+===================================================== */
+
+/* =====================================================
+   MAIN LAYOUT
 ===================================================== */
 
 main.main-content {
-  width: fit-content;                  /* card grows to content */
-  max-width: 95vw;                     /* never exceed viewport */
-  margin: 1rem auto 2rem;              /* centered like base */
-  text-align: left;                    /* dashboard content should be left-aligned */
+  width: min(1120px, 95vw);
+  margin: 1rem auto 2rem;
+  text-align: left;
   box-shadow: 0 0 30px rgba(0, 255, 255, 0.18);
 }
 
 
 /* =====================================================
-   PAGE TITLE
+   TYPOGRAPHY
 ===================================================== */
 
 .page-title {
   margin: 0 0 18px;
 }
 
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 1.25rem;
+}
+
+.page-header h1,
+.page-header h2,
+.page-header h3 {
+  margin: 0 0 6px;
+}
+
+.page-header p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
 
 /* =====================================================
-   ALERT BOXES (Success / Error)
+   ALERTS / FEEDBACK
 ===================================================== */
 
 .alert {
-  border: 1px solid rgba(255,255,255,0.15);
-  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.04);
   padding: 14px 16px;
   border-radius: 14px;
   margin-bottom: 18px;
@@ -52,7 +74,74 @@ main.main-content {
 
 
 /* =====================================================
-   INSTRUCTOR DASHBOARD
+   GENERIC BUTTONS / ACTION LINKS
+===================================================== */
+
+.btn-primary,
+.btn-secondary,
+.btn-danger,
+.dash-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.25s ease,
+    border-color 0.2s ease,
+    filter 0.2s ease,
+    color 0.2s ease,
+    background 0.2s ease;
+}
+
+.btn-primary,
+.dash-btn {
+  border: 1px solid rgba(0, 255, 255, 0.22);
+  background: rgba(0, 255, 255, 0.08);
+  color: var(--accent);
+}
+
+.btn-primary:hover,
+.dash-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 16px rgba(0, 255, 255, 0.14);
+  filter: brightness(1.05);
+  color: var(--accent);
+}
+
+.btn-secondary {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-light);
+}
+
+.btn-secondary:hover {
+  transform: translateY(-1px);
+  border-color: rgba(0, 255, 255, 0.22);
+  box-shadow: 0 0 14px rgba(0, 255, 255, 0.10);
+  color: var(--accent);
+}
+
+.btn-danger {
+  border: 1px solid rgba(255, 80, 80, 0.35);
+  background: rgba(255, 80, 80, 0.10);
+  color: #ff8a8a;
+}
+
+.btn-danger:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 16px rgba(255, 80, 80, 0.14);
+  filter: brightness(1.05);
+}
+
+
+/* =====================================================
+   DASHBOARD HEADER
 ===================================================== */
 
 .dash-header {
@@ -74,30 +163,9 @@ main.main-content {
   flex-wrap: wrap;
 }
 
-.dash-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.12);
-  background: rgba(0,0,0,0.12);
-  color: var(--text-light);
-  font-weight: 650;
-  text-decoration: none;
-  transition: transform 0.15s ease, box-shadow 0.25s ease, border-color 0.2s ease;
-}
-
-.dash-btn:hover {
-  transform: translateY(-1px);
-  border-color: rgba(0, 255, 255, 0.22);
-  box-shadow: 0 0 14px rgba(0, 255, 255, 0.12);
-  color: var(--accent);
-}
-
 
 /* =====================================================
-   STAT CARDS (Top KPIs)
+   KPI / STAT CARDS
 ===================================================== */
 
 .dash-grid {
@@ -108,8 +176,8 @@ main.main-content {
 }
 
 .stat-card {
-  border: 1px solid rgba(255,255,255,0.10);
-  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.03);
   border-radius: 14px;
   padding: 14px;
   text-align: left;
@@ -125,7 +193,7 @@ main.main-content {
   font-size: 30px;
   font-weight: 800;
   color: var(--accent);
-  text-shadow: 0 0 12px rgba(0,255,255,0.12);
+  text-shadow: 0 0 12px rgba(0, 255, 255, 0.12);
   line-height: 1.1;
 }
 
@@ -138,8 +206,6 @@ main.main-content {
 
 /* =====================================================
    PANELS
-   Default: 2 columns (nice for instructor dashboards)
-   Add class "dash-panels--3" in HTML if you ever want 3 columns.
 ===================================================== */
 
 .dash-panels {
@@ -149,14 +215,13 @@ main.main-content {
   margin-top: 16px;
 }
 
-/* Optional 3-column mode (future) */
 .dash-panels.dash-panels--3 {
   grid-template-columns: repeat(3, 1fr);
 }
 
 .panel {
-  border: 1px solid rgba(255,255,255,0.10);
-  background: rgba(0,0,0,0.10);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(0, 0, 0, 0.10);
   border-radius: 14px;
   padding: 14px;
   text-align: left;
@@ -180,15 +245,15 @@ main.main-content {
 
 
 /* =====================================================
-   TICKER WINDOW (Used for News / CVEs / Recent Activity)
+   TICKER WIDGETS
 ===================================================== */
 
 .ticker {
   position: relative;
   height: 160px;
   overflow: hidden;
-  border: 1px solid rgba(255,255,255,0.10);
-  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.03);
   border-radius: 14px;
   padding: 8px 10px;
 }
@@ -197,15 +262,12 @@ main.main-content {
   list-style: none;
   margin: 0;
   padding: 0;
-
   display: flex;
   flex-direction: column;
   gap: 8px;
-
   animation: tickerScroll 18s linear infinite;
 }
 
-/* Pause on hover */
 .ticker:hover .ticker-track {
   animation-play-state: paused;
 }
@@ -215,11 +277,10 @@ main.main-content {
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-
-  padding: 10px 10px;
+  padding: 10px;
   border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(0,0,0,0.12);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.12);
 }
 
 .ticker-email {
@@ -244,7 +305,7 @@ main.main-content {
 
 
 /* =====================================================
-   SECURITY NEWS WIDGET
+   NEWS LINKS
 ===================================================== */
 
 .news-link {
@@ -267,6 +328,226 @@ main.main-content {
 
 
 /* =====================================================
+   SCENARIOS HUB
+===================================================== */
+
+.scenarios-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 1.25rem;
+}
+
+.scenarios-hub {
+  padding: 1.25rem;
+}
+
+.scenario-subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.scenario-subtab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-light);
+  text-decoration: none;
+  font-weight: 650;
+  transition:
+    transform 0.15s ease,
+    border-color 0.2s ease,
+    box-shadow 0.25s ease,
+    color 0.2s ease,
+    background 0.2s ease;
+}
+
+.scenario-subtab:hover {
+  transform: translateY(-1px);
+  border-color: rgba(0, 255, 255, 0.22);
+  box-shadow: 0 0 14px rgba(0, 255, 255, 0.10);
+  color: var(--accent);
+}
+
+.scenario-subtab.active {
+  color: var(--accent);
+  border-color: rgba(0, 255, 255, 0.32);
+  background: rgba(0, 255, 255, 0.05);
+  box-shadow: 0 0 14px rgba(0, 255, 255, 0.14);
+}
+
+.scenario-panel {
+  margin-top: 0.75rem;
+}
+
+.panel-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 1rem;
+}
+
+.panel-heading h2 {
+  margin: 0 0 6px;
+}
+
+.panel-heading p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+
+/* =====================================================
+   SCENARIO GRID / VIEW CARDS
+===================================================== */
+
+.scenario-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1rem;
+}
+
+.scenario-card {
+  padding: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 14px;
+}
+
+.scenario-card-top h3,
+.scenario-list-main h3 {
+  margin: 0 0 6px;
+}
+
+.scenario-card-top p,
+.scenario-list-main p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.scenario-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  font-size: 0.92rem;
+  color: var(--text-muted);
+}
+
+.scenario-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.scenario-pre {
+  white-space: pre-wrap;
+  overflow: auto;
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-light);
+}
+
+.scenario-pre-scroll {
+  max-height: 280px;
+}
+
+
+/* =====================================================
+   SCENARIO LIST / UPDATE / DELETE
+===================================================== */
+
+.scenario-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.scenario-list-card {
+  padding: 1.15rem;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 14px;
+}
+
+.scenario-list-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.danger-card {
+  border-color: rgba(255, 80, 80, 0.28);
+  box-shadow: 0 0 16px rgba(255, 80, 80, 0.08);
+}
+
+.empty-state-card,
+.action-card {
+  padding: 1.5rem;
+}
+
+.empty-state-card h3,
+.action-card h3 {
+  margin-top: 0;
+}
+
+.empty-state-card p,
+.action-card p {
+  color: var(--text-muted);
+}
+
+
+/* =====================================================
+   GENERATOR / FORM-STYLE HELPERS
+===================================================== */
+
+.form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.form-card {
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.form-card h3 {
+  margin-top: 0;
+}
+
+.form-muted {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+
+/* =====================================================
    RESPONSIVE
 ===================================================== */
 
@@ -275,13 +556,26 @@ main.main-content {
     grid-template-columns: 1fr;
   }
 
-  .dash-panels {
+  .dash-panels,
+  .dash-panels.dash-panels--3 {
     grid-template-columns: 1fr;
   }
 
-  .dash-header {
+  .dash-header,
+  .page-header,
+  .panel-heading,
+  .scenario-list-main,
+  .scenarios-header {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .scenario-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -289,5 +583,13 @@ main.main-content {
   main.main-content {
     width: 95vw;
     max-width: 95vw;
+  }
+
+  .scenario-subtabs {
+    flex-direction: column;
+  }
+
+  .scenario-subtab {
+    width: 100%;
   }
 }

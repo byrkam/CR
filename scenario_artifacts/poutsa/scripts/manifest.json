@@ -1,0 +1,26 @@
+{
+  "namespaces": {
+    "ap": "ns-ap",
+    "sta": "ns-sta"
+  },
+  "aps": [
+    {
+      "iface": "wlan0",
+      "ns": "ns-ap"
+    }
+  ],
+  "stas": [
+    {
+      "iface": "wlan1",
+      "ns": "ns-sta"
+    },
+    {
+      "iface": "wlan2",
+      "ns": "ns-sta"
+    },
+    {
+      "iface": "wlan3",
+      "ns": "ns-sta"
+    }
+  ]
+}

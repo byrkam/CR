@@ -1,0 +1,517 @@
+/* =====================================================
+   TESTBED CREATOR
+   Standalone-generator look, adapted to app shell
+===================================================== */
+
+/* Expand the page inside the base layout */
+main.main-content {
+  width: min(1280px, 96vw) !important;
+  max-width: min(1280px, 96vw) !important;
+  margin: 1.25rem auto 2rem !important;
+  padding: 0 !important;
+  text-align: left !important;
+  box-sizing: border-box;
+}
+
+/* Main wrapper */
+.testbed-page {
+  --bg: #0b1117;
+  --card: #121a22;
+  --text: #e6edf3;
+  --accent: #00e5ff;
+  --border: #1e2a36;
+  --danger: #ff6b6b;
+  --success: #53d769;
+}
+
+/* =====================================================
+   HEADER
+===================================================== */
+
+.testbed-page .tb-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  margin-bottom: 22px;
+}
+
+.testbed-page .tb-header-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.testbed-page h1 {
+  font-size: 34px;
+  line-height: 1.15;
+  margin: 0;
+  color: var(--accent);
+}
+
+.testbed-page h2 {
+  font-size: 26px;
+  line-height: 1.2;
+  margin: 0 0 8px;
+}
+
+.testbed-page h3 {
+  font-size: 20px;
+  margin: 0 0 10px;
+}
+
+.testbed-page .subtitle {
+  font-size: 15px;
+  opacity: 0.88;
+  margin-top: 8px;
+  max-width: 780px;
+}
+
+.testbed-page .toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.testbed-page .back-link,
+.testbed-page .toggle-theme {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.testbed-page .toggle-theme {
+  appearance: none;
+}
+
+/* =====================================================
+   CARDS
+===================================================== */
+
+.testbed-page .card {
+  background: var(--card);
+  border-radius: 14px;
+  padding: 24px;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.08);
+  margin-top: 20px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.testbed-page.dark .card {
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.testbed-page .intro-card-header,
+.testbed-page .section-header,
+.testbed-page .layout-results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+}
+
+.testbed-page .mode-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.testbed-page .hint,
+.testbed-page .results-hint {
+  font-size: 14px;
+  color: #777;
+  margin-bottom: 8px;
+}
+
+.testbed-page.dark .hint,
+.testbed-page.dark .results-hint {
+  color: #aaa;
+}
+
+/* =====================================================
+   PRESET GRID
+===================================================== */
+
+.testbed-page .preset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(195px, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.testbed-page .preset {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease;
+  background: var(--card);
+  min-height: 128px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.testbed-page .preset:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.10);
+  transform: translateY(-1px);
+}
+
+.testbed-page .preset-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.testbed-page .preset-body {
+  font-size: 13px;
+  line-height: 1.45;
+  color: #666;
+}
+
+.testbed-page.dark .preset-body {
+  color: #aaa;
+}
+
+/* =====================================================
+   FORM
+===================================================== */
+
+.testbed-page .meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+
+.testbed-page .input-group {
+  margin-bottom: 10px;
+}
+
+.testbed-page label {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  margin-top: 10px;
+  margin-bottom: 6px;
+}
+
+.testbed-page input[type="text"],
+.testbed-page textarea {
+  width: 100%;
+  padding: 12px 13px;
+  font-size: 15px;
+  line-height: 1.4;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+  box-sizing: border-box;
+  resize: vertical;
+}
+
+.testbed-page textarea {
+  min-height: 340px;
+}
+
+/* =====================================================
+   BUTTONS
+===================================================== */
+
+.testbed-page button {
+  background-color: var(--accent);
+  color: white;
+  padding: 11px 18px;
+  font-size: 15px;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  margin-top: 10px;
+  cursor: pointer;
+}
+
+.testbed-page button:hover {
+  filter: brightness(1.05);
+}
+
+.testbed-page .secondary-btn {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+
+.testbed-page .actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+/* =====================================================
+   ALERTS / INFO
+===================================================== */
+
+.testbed-page .message-box {
+  margin: 14px 0 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.testbed-page .message-box.error {
+  border: 1px solid var(--danger);
+  background: rgba(192, 57, 43, 0.08);
+  color: var(--danger);
+}
+
+.testbed-page .message-box.success {
+  border: 1px solid var(--success);
+  background: rgba(30, 132, 73, 0.08);
+  color: var(--success);
+}
+
+.testbed-page .guide-box {
+  margin: 14px 0 16px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px dashed var(--border);
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.testbed-page.dark .guide-box {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.testbed-page .guide-box-danger {
+  border-color: #c0392b;
+  background: rgba(192, 57, 43, 0.06);
+}
+
+.testbed-page .guide-title {
+  font-size: 14px;
+  font-weight: 700;
+  opacity: 0.95;
+}
+
+.testbed-page .guide-title-danger {
+  color: #c0392b;
+}
+
+.testbed-page .guide-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+  gap: 12px;
+}
+
+.testbed-page .scenario-pill {
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  opacity: 0.95;
+}
+
+.testbed-page .guide-text {
+  font-size: 13px;
+  margin: 0 0 10px;
+  line-height: 1.5;
+}
+
+.testbed-page .field-tips-title {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  opacity: 0.9;
+}
+
+.testbed-page .field-tips {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 8px 18px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.testbed-page .field-tip-name {
+  font-weight: 700;
+}
+
+.testbed-page .field-tip-desc {
+  opacity: 0.95;
+}
+
+.testbed-page ul.validation-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+/* =====================================================
+   RESULTS
+===================================================== */
+
+.testbed-page pre {
+  background: #272822;
+  color: #f8f8f2;
+  padding: 15px;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-size: 14px;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.testbed-page .tabs {
+  display: flex;
+  margin-top: 26px;
+}
+
+.testbed-page .tab {
+  flex: 1;
+  text-align: center;
+  padding: 12px;
+  cursor: pointer;
+  background: var(--card);
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s ease;
+  font-size: 15px;
+  user-select: none;
+}
+
+.testbed-page .tab.active {
+  border-bottom: 3px solid var(--accent);
+  font-weight: 700;
+}
+
+.testbed-page .tab-content {
+  display: none;
+}
+
+.testbed-page .tab-content.active {
+  display: block;
+  animation: fadeIn 0.25s ease-in-out;
+}
+
+.testbed-page #network {
+  width: 100%;
+  height: 430px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-top: 10px;
+  background: var(--card);
+}
+
+.testbed-page details {
+  margin-top: 14px;
+}
+
+.testbed-page summary {
+  cursor: pointer;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.testbed-page .footer {
+  margin-top: 34px;
+  text-align: center;
+  font-size: 13px;
+  color: #888;
+}
+
+.testbed-page .hidden {
+  display: none;
+}
+
+.testbed-page .vis-tooltip {
+  white-space: pre-line;
+  font-size: 12px;
+  padding: 6px 8px;
+}
+
+/* =====================================================
+   ANIMATION
+===================================================== */
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* =====================================================
+   RESPONSIVE
+===================================================== */
+
+@media (max-width: 900px) {
+  .testbed-page .tb-header,
+  .testbed-page .guide-header,
+  .testbed-page .layout-results-header,
+  .testbed-page .intro-card-header,
+  .testbed-page .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .testbed-page .meta-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .testbed-page .preset-grid,
+  .testbed-page .field-tips {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  main.main-content {
+    width: 96vw !important;
+    max-width: 96vw !important;
+  }
+
+  .testbed-page {
+    padding: 0 2px 20px;
+  }
+
+  .testbed-page .tabs {
+    flex-direction: column;
+  }
+
+  .testbed-page .card {
+    padding: 18px;
+  }
+
+  .testbed-page h1 {
+    font-size: 28px;
+  }
+
+  .testbed-page h2 {
+    font-size: 22px;
+  }
+
+  .testbed-page textarea {
+    min-height: 280px;
+  }
+}

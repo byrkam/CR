@@ -1,0 +1,482 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="testbed-page">
+  <header class="tb-header">
+    <div class="tb-header-copy">
+      <h1>
+        {% if editing_scenario %}
+          🧪 Update Wi-Fi Testbed Scenario
+        {% else %}
+          🧪 Wi-Fi Testbed Generator
+        {% endif %}
+      </h1>
+      <div class="subtitle">
+        {% if editing_scenario %}
+          Refine your saved lab scenario using the original generator workflow.
+        {% else %}
+          Step 1: pick a base configuration. Step 2: adjust values, preview the generated lab, then save it.
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <a class="back-link" href="{{ url_for('instructor_scenarios', tab='view') }}">← Back to scenarios</a>
+    </div>
+  </header>
+
+  <div class="card intro-card">
+    <div class="intro-card-header">
+      <div>
+        <h2>Step 1: Choose a base configuration</h2>
+        <div class="hint">
+          Start from one of the predefined scenarios below. You can fine-tune the details in the next step.
+        </div>
+      </div>
+
+      {% if editing_scenario %}
+        <div class="mode-badge">Editing existing scenario</div>
+      {% endif %}
+    </div>
+
+    <div class="preset-grid">
+      <div class="preset" onclick="loadPreset('open-basic')">
+        <div class="preset-title">Open lab</div>
+        <div class="preset-body">
+          1× AP with <code>open</code> network, a few STAs.
+          Good for connectivity and namespace testing.
+        </div>
+      </div>
+
+      <div class="preset" onclick="loadPreset('wpa2-basic')">
+        <div class="preset-title">WPA2 lab</div>
+        <div class="preset-body">
+          1× WPA2-Personal AP (<code>wpa2-psk</code>), passphrase-based, multiple STAs.
+        </div>
+      </div>
+
+      <div class="preset" onclick="loadPreset('wpa3-basic')">
+        <div class="preset-title">WPA3 lab</div>
+        <div class="preset-body">
+          1× WPA3-Personal AP (<code>wpa3-sae</code>), modern SAE handshake.
+        </div>
+      </div>
+
+      <div class="preset" onclick="loadPreset('wpa2-enterprise')">
+        <div class="preset-title">WPA2-Enterprise</div>
+        <div class="preset-body">
+          WPA2-Enterprise (<code>wpa2-enterprise</code>) with a RADIUS block for 802.1X tests.
+        </div>
+      </div>
+
+      <div class="preset" onclick="loadPreset('wpa3-enterprise')">
+        <div class="preset-title">WPA3-Enterprise</div>
+        <div class="preset-body">
+          WPA3-Enterprise (<code>wpa3-enterprise</code>) with mandatory PMF.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="step2" class="card {% if not show_step2 %}hidden{% endif %}">
+    <form method="POST" autocomplete="off">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="scenario" id="scenario" value="{{ scenario or '' }}">
+
+      <div class="section-header">
+        <div>
+          <h2 id="step2-title">
+            {% if editing_scenario %}
+              Step 2: Adjust and update
+            {% else %}
+              Step 2: Adjust and generate
+            {% endif %}
+          </h2>
+          <div class="hint">
+            Do not add or remove AP/RADIUS blocks. You can change values (SSID, Band, Channel, Passphrase, Stations, RADIUS IP, etc.)
+            but the <code>Security:</code> lines are fixed by your preset and should not be edited.
+          </div>
+        </div>
+      </div>
+
+      <div class="meta-grid">
+        <div class="input-group">
+          <label for="title">Scenario title</label>
+          <input
+            type="text"
+            id="title"
+            name="title"
+            value="{{ title_value or (form_data.title if form_data else '') }}"
+            required
+          >
+        </div>
+
+        <div class="input-group">
+          <label for="summary">Short summary</label>
+          <input
+            type="text"
+            id="summary"
+            name="summary"
+            value="{{ summary_value or (form_data.summary if form_data else '') }}"
+            placeholder="Optional short description of the lab"
+          >
+        </div>
+      </div>
+
+      {% if save_error %}
+        <div class="message-box error">{{ save_error }}</div>
+      {% endif %}
+
+      {% if error %}
+        <div class="message-box error">{{ error }}</div>
+      {% endif %}
+
+      {% if validation_errors %}
+        <div class="guide-box guide-box-danger">
+          <div class="guide-title guide-title-danger">
+            Please fix these issues:
+          </div>
+          <ul class="validation-list">
+            {% for e in validation_errors %}
+              <li>{{ e }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+
+      {% if errors %}
+        <div class="guide-box guide-box-danger">
+          <div class="guide-title guide-title-danger">
+            Please fix these issues before generating:
+          </div>
+          <ul class="validation-list">
+            {% for e in errors %}
+              <li>{{ e }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+
+      <div class="guide-box">
+        <div class="guide-header">
+          <span class="guide-title">Scenario overview</span>
+          <span id="scenario-label" class="scenario-pill">No scenario selected</span>
+        </div>
+
+        <p id="scenario-description" class="guide-text">
+          Select a preset in Step 1 to see guidance for that scenario.
+        </p>
+
+        <div class="field-tips-title">Field tips</div>
+        <div class="field-tips">
+          <div class="field-tip">
+            <div class="field-tip-name">Country:</div>
+            <div class="field-tip-desc">
+              Two-letter regulatory country code (e.g. <code>GR</code>, <code>US</code>, <code>DE</code>).
+              Mapped to <code>country_code</code> in hostapd.
+            </div>
+          </div>
+
+          <div class="field-tip">
+            <div class="field-tip-name">AP N:</div>
+            <div class="field-tip-desc">
+              Logical AP index. Keep the <code>AP 1:</code>, <code>AP 2:</code> lines as they are.
+            </div>
+          </div>
+
+          <div class="field-tip">
+            <div class="field-tip-name">SSID:</div>
+            <div class="field-tip-desc">
+              Broadcast Wi-Fi network name, e.g. <code>SSID: "lab-open"</code>.
+            </div>
+          </div>
+
+          <div class="field-tip">
+            <div class="field-tip-name">Band:</div>
+            <div class="field-tip-desc">
+              Frequency band for the AP, e.g. <code>2.4 GHz</code> or <code>5 GHz</code>.
+            </div>
+          </div>
+
+          <div class="field-tip">
+            <div class="field-tip-name">Channel:</div>
+            <div class="field-tip-desc">
+              Channel number within the chosen band. Make sure it fits the country.
+            </div>
+          </div>
+
+          <div class="field-tip">
+            <div class="field-tip-name">Security:</div>
+            <div class="field-tip-desc">
+              Fixed by the preset. Do <strong>not</strong> change it manually.
+            </div>
+          </div>
+
+          <div class="field-tip">
+            <div class="field-tip-name">Passphrase:</div>
+            <div class="field-tip-desc">
+              Shared secret for WPA2/WPA3-Personal presets.
+            </div>
+          </div>
+
+          <div class="field-tip">
+            <div class="field-tip-name">Stations:</div>
+            <div class="field-tip-desc">
+              Number of simulated clients that will connect to this AP.
+            </div>
+          </div>
+
+          <div class="field-tip">
+            <div class="field-tip-name">RADIUS Address / Port:</div>
+            <div class="field-tip-desc">
+              Enterprise preset settings mapped to hostapd authenticator fields.
+            </div>
+          </div>
+
+          <div class="field-tip">
+            <div class="field-tip-name">Shared secret:</div>
+            <div class="field-tip-desc">
+              RADIUS shared secret used by hostapd.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="input-group">
+        <label for="description">Structured description</label>
+        <textarea name="description" id="description" rows="14" required>{{ description|default('', true) }}</textarea>
+      </div>
+
+      <div class="actions-row">
+        <button type="submit" name="action" value="generate">
+          Generate testbed
+        </button>
+
+        {% if topology and script %}
+          <button type="submit" name="action" value="save" class="secondary-btn">
+            {% if editing_scenario %}
+              Update scenario
+            {% else %}
+              Save scenario
+            {% endif %}
+          </button>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+
+  {% if script or topology %}
+    <div class="layout-results-header">
+      <h2>Results</h2>
+      <div class="results-hint">Preview the generated shell script, topology, and configuration files.</div>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('script')">📜 Script</div>
+      <div class="tab" onclick="switchTab('topology')">🗺 Topology</div>
+      <div class="tab" onclick="switchTab('configs')">⚙️ Configs</div>
+    </div>
+  {% endif %}
+
+  {% if script %}
+    <div id="script" class="tab-content active card">
+      <h3>Shell Script (mac80211_hwsim + namespaces)</h3>
+      <pre>{{ script }}</pre>
+    </div>
+  {% endif %}
+
+  {% if topology %}
+    <div id="topology" class="tab-content card">
+      <h3>Visual Topology</h3>
+      <div id="network"></div>
+      <script>
+        const topologyData = {{ topology | tojson }};
+        renderTopology(topologyData);
+      </script>
+    </div>
+  {% endif %}
+
+  {% if topology and configs %}
+    <div id="configs" class="tab-content card">
+      <h3>Generated Configs</h3>
+
+      {% for ap in topology.aps %}
+        <details>
+          <summary>AP {{ ap.id }} · SSID "{{ ap.ssid }}" · {{ ap.security_mode }}</summary>
+          <pre>{{ configs.ap[ap.id] }}</pre>
+        </details>
+
+        {% for sta in ap.stas %}
+          <details>
+            <summary>{{ sta }} → {{ ap.ssid }}</summary>
+            <pre>{{ configs.sta[sta] }}</pre>
+          </details>
+        {% endfor %}
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <div class="footer">
+    Built with Flask + vis-network · presets: Open, WPA2, WPA3, WPA2-Enterprise, WPA3-Enterprise
+  </div>
+</div>
+
+<script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+<script src="{{ url_for('static', filename='js/topology.js') }}"></script>
+
+<script>
+  function switchTab(id) {
+    document.querySelectorAll('.testbed-page .tab').forEach(tab => tab.classList.remove('active'));
+    document.querySelectorAll('.testbed-page .tab-content').forEach(tab => tab.classList.remove('active'));
+
+    const content = document.getElementById(id);
+    if (content) content.classList.add('active');
+
+    const tab = document.querySelector(`.testbed-page .tab[onclick="switchTab('${id}')"]`);
+    if (tab) tab.classList.add('active');
+  }
+
+  function getDescriptionEl() {
+    return document.getElementById('description');
+  }
+
+  function getScenarioEl() {
+    return document.getElementById('scenario');
+  }
+
+  function showStep2() {
+    const step2 = document.getElementById('step2');
+    if (step2) {
+      step2.classList.remove('hidden');
+      step2.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  function getScenarioLabelEl() {
+    return document.getElementById('scenario-label');
+  }
+
+  function getScenarioDescEl() {
+    return document.getElementById('scenario-description');
+  }
+
+  const SCENARIO_INFO = {
+    'open-basic': {
+      label: 'Open lab',
+      desc: 'Single AP with Security: open (no encryption). Good for basic connectivity, namespace plumbing, and quick experiments where authentication is not important.'
+    },
+    'wpa2-basic': {
+      label: 'WPA2 lab',
+      desc: 'Single AP with Security: wpa2-psk (WPA2-Personal). All stations share the same passphrase. Ideal for classic WPA2 tests and interoperability checks.'
+    },
+    'wpa3-basic': {
+      label: 'WPA3 lab',
+      desc: 'Single AP with Security: wpa3-sae (WPA3-Personal). Uses SAE handshake and protected management frames; good for modern security experiments.'
+    },
+    'wpa2-enterprise': {
+      label: 'WPA2-Enterprise',
+      desc: 'Single AP with Security: wpa2-enterprise, backed by a RADIUS server. Useful for 802.1X/EAP experiments and enterprise-style deployments.'
+    },
+    'wpa3-enterprise': {
+      label: 'WPA3-Enterprise',
+      desc: 'Single AP with Security: wpa3-enterprise. Similar to WPA2-Enterprise but with mandatory PMF; suitable for high-security enterprise scenarios.'
+    }
+  };
+
+  function updateGuidance(scenarioId) {
+    const labelEl = getScenarioLabelEl();
+    const descEl = getScenarioDescEl();
+    const info = SCENARIO_INFO[scenarioId];
+
+    if (info) {
+      labelEl.textContent = info.label;
+      descEl.textContent = info.desc;
+    } else {
+      labelEl.textContent = 'No scenario selected';
+      descEl.textContent = 'Select a preset in Step 1 to see guidance for that scenario.';
+    }
+  }
+
+  function loadPreset(id) {
+    showStep2();
+    const textarea = getDescriptionEl();
+    const scenarioInput = getScenarioEl();
+    let preset = '';
+
+    if (id === 'open-basic') {
+      preset = `Country: GR
+
+AP 1:
+  SSID: "lab-open"
+  Band: 2.4 GHz
+  Channel: 6
+  Security: open
+  Stations: 4`;
+    } else if (id === 'wpa2-basic') {
+      preset = `Country: GR
+
+AP 1:
+  SSID: "lab-wpa2"
+  Band: 2.4 GHz
+  Channel: 6
+  Security: wpa2-psk
+  Passphrase: "labpassword"
+  Stations: 4`;
+    } else if (id === 'wpa3-basic') {
+      preset = `Country: GR
+
+AP 1:
+  SSID: "lab-wpa3"
+  Band: 5 GHz<span>Toggle theme</span>
+  Channel: 36
+  Security: wpa3-sae
+  Passphrase: "labwpa3pass"
+  Stations: 3`;
+    } else if (id === 'wpa2-enterprise') {
+      preset = `Country: GR
+
+AP 1:
+  SSID: "corp-wpa2-ent"
+  Band: 5 GHz
+  Channel: 36
+  Security: wpa2-enterprise
+  Stations: 3
+
+RADIUS:
+  Address: 192.168.50.10
+  Port: 1812
+  Shared secret: "radiussecret"`;
+    } else if (id === 'wpa3-enterprise') {
+      preset = `Country: GR
+
+AP 1:
+  SSID: "corp-wpa3-ent"
+  Band: 5 GHz
+  Channel: 36
+  Security: wpa3-enterprise
+  Stations: 3
+
+RADIUS:
+  Address: 192.168.60.10
+  Port: 1812
+  Shared secret: "radiussecret"`;
+    }
+
+    if (textarea && preset) {
+      textarea.value = preset;
+      textarea.focus();
+      textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
+    }
+
+    if (scenarioInput) {
+      scenarioInput.value = id;
+    }
+
+    updateGuidance(id);
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const scenarioFromServer = "{{ scenario or '' }}";
+    updateGuidance(scenarioFromServer);
+  });
+</script>
+{% endblock %}

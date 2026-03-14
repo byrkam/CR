@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="dashboard-section">
+    <div class="cyber-card form-shell">
+        <h1>Update Scenario</h1>
+
+        {% if error %}
+            <div class="form-alert error">{{ error }}</div>
+        {% endif %}
+
+        <form method="POST" class="scenario-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <label>Title</label>
+            <input type="text" name="title" value="{{ scenario.title }}" required>
+
+            <label>Description</label>
+            <textarea name="description" rows="5" required>{{ scenario.description }}</textarea>
+
+            <label>Category</label>
+            <input type="text" name="category" value="{{ scenario.category }}">
+
+            <label>Difficulty</label>
+            <select name="difficulty">
+                <option value="beginner" {% if scenario.difficulty == 'beginner' %}selected{% endif %}>Beginner</option>
+                <option value="intermediate" {% if scenario.difficulty == 'intermediate' %}selected{% endif %}>Intermediate</option>
+                <option value="advanced" {% if scenario.difficulty == 'advanced' %}selected{% endif %}>Advanced</option>
+            </select>
+
+            <label>Points</label>
+            <input type="number" name="points" min="1" value="{{ scenario.points }}">
+
+            <div class="form-actions">
+                <a href="{{ url_for('instructor_scenarios') }}" class="btn-secondary">Cancel</a>
+                <button type="submit" class="btn-primary">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</section>
+{% endblock %}

@@ -1,16 +1,19 @@
 from flask import Flask, render_template, request, redirect, url_for, session
+import json
 from flask_wtf import CSRFProtect
 import requests
-from urllib.parse import urlencode
 from flask_wtf.csrf import generate_csrf
 from functools import wraps
-from models import db, User
+from models import db, User, Scenario
+from scenario_engine import build_scenario_bundle, build_testbed_context, validate_description
 from datetime import datetime, timedelta
 import re
 import secrets
 import string
 import feedparser
 import time
+import shutil
+from pathlib import Path
 
 # ====================================================
 #               APP CONFIGURATION
@@ -38,8 +41,8 @@ csrf = CSRFProtect(app)
 
 @app.context_processor
 def inject_csrf_token():
-    # Makes csrf_token() available in all templates
     return dict(csrf_token=generate_csrf)
+
 
 @app.context_processor
 def inject_current_user():
@@ -47,7 +50,7 @@ def inject_current_user():
     if not user_id:
         return {"current_user": None, "current_user_role": None}
 
-    user = db.session.get(User, user_id)  # avoids legacy Query.get warning
+    user = db.session.get(User, user_id)
     return {
         "current_user": user,
         "current_user_role": user.role if user else None
@@ -57,7 +60,6 @@ def inject_current_user():
 #            VALIDATION FUNCTIONS
 # ====================================================
 
-# --- Password rules ---
 def is_strong_password(password):
     """Check if password meets strength requirements."""
     if len(password) < 8:
@@ -91,20 +93,21 @@ def generate_strong_password(length=14):
     return "".join(pwd_list)
 
 
-# --- Email format validation ---
 EMAIL_REGEX = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+
 
 def is_valid_email(email):
     """Check if email follows the username@mailserver.domain format."""
     return re.match(EMAIL_REGEX, email) is not None
-    
-# --- Username format validation ---
-    
+
+
 USERNAME_REGEX = r"^[a-zA-Z0-9_]{3,20}$"
+
 
 def is_valid_username(username: str) -> bool:
     return re.match(USERNAME_REGEX, username) is not None
-    
+
+
 # ====================================================
 #                 NEWS CACHE
 # ====================================================
@@ -123,6 +126,7 @@ CVE_CACHE = {
 
 CVE_CACHE_DURATION = 1800  # 30 minutes
 
+
 def fetch_wifi_security_news():
     """
     Fetch Wi-Fi / WLAN security news from RSS feeds with STRICT Wi-Fi matching.
@@ -131,14 +135,11 @@ def fetch_wifi_security_news():
 
     Returns: [{"title": str, "link": str, "source": str}, ...]  (max 12)
     """
-
     global NEWS_CACHE
 
-    # Return cached data if still valid
     if time.time() - NEWS_CACHE["timestamp"] < NEWS_CACHE_DURATION:
         return NEWS_CACHE["data"]
 
-    # More wireless/network-relevant feeds (still mixed with general security)
     feeds = [
         "https://www.wifi-alliance.org/rss.xml",
         "https://www.securityweek.com/feed/",
@@ -148,8 +149,6 @@ def fetch_wifi_security_news():
         "https://thehackernews.com/feeds/posts/default/-/Wi-Fi%20hacking?alt=rss",
     ]
 
-    # ---------- STRICT WI-FI ANCHORS ----------
-    # Must match at least one of these (title preferred; summary allowed for strong anchors)
     anchor_patterns_title = [
         r"\bwi[- ]?fi\b",
         r"\bwlan\b",
@@ -202,7 +201,6 @@ def fetch_wifi_security_news():
     items = []
     seen_links = set()
 
-    # ---------- PASS 1: STRICT WI-FI ONLY ----------
     for url in feeds:
         feed = feedparser.parse(url)
         source = feed.feed.get("title", "Security News")
@@ -231,9 +229,6 @@ def fetch_wifi_security_news():
         if len(items) >= 12:
             break
 
-    # ---------- PASS 2: FALLBACK (NETWORK DEVICE SECURITY) ----------
-    # If strict Wi-Fi matches are too few, allow network-device terms in TITLE
-    # (still keeps things relevant; avoids "totally unrelated" headlines).
     if len(items) < 5:
         fallback_patterns = [
             r"\brouter(s)?\b",
@@ -275,17 +270,16 @@ def fetch_wifi_security_news():
             if len(items) >= 12:
                 break
 
-    # Cache result (even if empty; avoids repeated fetch storms)
     NEWS_CACHE["data"] = items[:12]
     NEWS_CACHE["timestamp"] = time.time()
     return NEWS_CACHE["data"]
-    
+
+
 def fetch_wifi_cves():
     """
     Fetch recent Wi-Fi-related CVEs from NVD API 2.0 using keywordSearch.
     Includes robust error/debug printing + retry behavior for NVD 404 quirks.
     """
-
     global CVE_CACHE
 
     if time.time() - CVE_CACHE["timestamp"] < CVE_CACHE_DURATION:
@@ -293,20 +287,16 @@ def fetch_wifi_cves():
 
     base_url = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 
-    # Single-keyword queries (because multiple keywords behave like AND)
     queries = [
         "wifi", "wlan", "802.11", "wpa2", "wpa3", "eapol", "pmkid",
         "access point", "evil twin", "deauthentication"
     ]
 
-    # 120-day window (NVD often expects ISO-8601 with an offset; Z is UTC)
     end_dt = datetime.utcnow()
     start_dt = end_dt - timedelta(days=120)
     pub_start = start_dt.strftime("%Y-%m-%dT%H:%M:%S.000Z")
     pub_end = end_dt.strftime("%Y-%m-%dT%H:%M:%S.999Z")
 
-    # Optional API key (strongly recommended)
-    # export NVD_API_KEY="your_key_here"
     import os
     headers = {}
     api_key = os.getenv("NVD_API_KEY")
@@ -320,7 +310,6 @@ def fetch_wifi_cves():
         return ""
 
     def try_request(params: dict):
-        """Make the request; return (data_json, response_obj)."""
         r = requests.get(base_url, params=params, headers=headers, timeout=15)
         r.raise_for_status()
         return r.json(), r
@@ -328,7 +317,6 @@ def fetch_wifi_cves():
     merged = {}
 
     for kw in queries:
-        # First attempt: with pub date window
         params = {
             "resultsPerPage": 20,
             "startIndex": 0,
@@ -356,7 +344,6 @@ def fetch_wifi_cves():
                 print("Body   :", body_preview)
             print("==================================\n")
 
-            # Retry if NVD returns 404 with date params (common quirk / gating)
             if status == 404:
                 try:
                     params_retry = {
@@ -383,7 +370,6 @@ def fetch_wifi_cves():
             print("CVE fetch error:", e)
             continue
 
-        # DEBUG: confirm what we fetched
         print("\n========== NVD API DEBUG ==========")
         print("Keyword:", kw)
         print("URL    :", r.url)
@@ -401,7 +387,6 @@ def fetch_wifi_cves():
             if not desc:
                 continue
 
-            # strict: ensure kw appears in description (keeps it Wi-Fi-ish)
             if kw.lower() not in desc.lower():
                 continue
 
@@ -421,6 +406,7 @@ def fetch_wifi_cves():
 # ====================================================
 #                 AUTH HELPERS
 # ====================================================
+
 def login_required(f):
     """Ensure the route is accessible only when logged in."""
     @wraps(f)
@@ -436,12 +422,53 @@ def role_required(role):
     def wrapper(f):
         @wraps(f)
         def decorated(*args, **kwargs):
-            user = User.query.get(session.get("user_id"))
+            user = db.session.get(User, session.get("user_id"))
             if not user or user.role != role:
                 return "Access Denied", 403
             return f(*args, **kwargs)
         return decorated
     return wrapper
+
+
+# ====================================================
+#              SCENARIO HELPERS
+# ====================================================
+
+def generate_unique_slug(title: str) -> str:
+    base = re.sub(r"[^a-z0-9\s-]", "", title.lower()).strip()
+    base = re.sub(r"[\s-]+", "-", base).strip("-") or "scenario"
+    slug = base
+    counter = 2
+    while Scenario.query.filter_by(slug=slug).first():
+        slug = f"{base}-{counter}"
+        counter += 1
+    return slug
+
+
+def safe_remove_artifact_dir(path_str: str | None) -> None:
+    if not path_str:
+        return
+    path = Path(path_str)
+    if path.exists() and path.is_dir():
+        shutil.rmtree(path, ignore_errors=True)
+
+
+def build_scenario_form_context():
+    return {
+        "script": "",
+        "topology": None,
+        "description": "",
+        "show_step2": False,
+        "scenario": "",
+        "errors": [],
+        "configs": None,
+        "title_value": "",
+        "summary_value": "",
+        "save_error": None,
+        "validation_errors": [],
+        "form_data": None,
+        "editing_scenario": None,
+    }
 
 
 # ====================================================
@@ -451,7 +478,6 @@ def role_required(role):
 # ---------- HOME / LANDING PAGE ----------
 @app.route("/")
 def home():
-    """Landing page for role selection."""
     return render_template("home.html", page_style="home.css", title="Wi-Fi Labs – Choose Login")
 
 
@@ -459,25 +485,23 @@ def home():
 @app.route("/dashboard")
 @login_required
 def dashboard_redirect():
-    """Redirect user to their correct dashboard based on role."""
-    user = User.query.get(session["user_id"])
+    user = db.session.get(User, session["user_id"])
     if not user:
         return redirect(url_for("home"))
 
     if user.role == "admin":
         return redirect(url_for("admin_dashboard"))
-    elif user.role == "instructor":
+    if user.role == "instructor":
         return redirect(url_for("instructor_dashboard"))
-    elif user.role == "learner":
+    if user.role == "learner":
         return redirect(url_for("learner_dashboard"))
-    else:
-        return redirect(url_for("home"))
+    return redirect(url_for("home"))
 
 
 # ---------- GENERAL LOGIN (Admin only or fallback) ----------
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    session.clear()  # 🔐 Clear any existing session
+    session.clear()
 
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
@@ -491,9 +515,9 @@ def login():
             session["user_id"] = user.id
             if user.role == "admin":
                 return redirect(url_for("admin_dashboard"))
-            elif user.role == "instructor":
+            if user.role == "instructor":
                 return redirect(url_for("instructor_dashboard"))
-            elif user.role == "learner":
+            if user.role == "learner":
                 return redirect(url_for("learner_dashboard"))
 
         return render_template("login.html", error="Invalid credentials", page_style="login.css")
@@ -549,7 +573,8 @@ def signup_instructor():
         return redirect(url_for("login_instructor"))
 
     return render_template("signup_instructor.html", page_style="login.css", title="Instructor Signup – Wi-Fi Labs")
-    
+
+
 # ====================================================
 #                INSTRUCTOR ROUTES
 # ====================================================
@@ -565,7 +590,311 @@ def instructor_dashboard():
 @login_required
 @role_required("instructor")
 def instructor_scenarios():
-    return render_template("instructor_scenarios.html", page_style="instructor.css")
+    user = db.session.get(User, session["user_id"])
+    active_tab = request.args.get("tab", "view").lower()
+    if active_tab not in {"view", "create", "update", "delete"}:
+        active_tab = "view"
+
+    scenarios = (
+        Scenario.query
+        .filter_by(created_by_id=user.id)
+        .order_by(Scenario.created_at.desc())
+        .all()
+    )
+
+    edit_scenario_id = request.args.get("scenario_id", type=int)
+    edit_scenario = None
+    if active_tab == "update" and edit_scenario_id:
+        edit_scenario = Scenario.query.filter_by(
+            id=edit_scenario_id,
+            created_by_id=user.id
+        ).first()
+
+    return render_template(
+        "instructor_scenarios.html",
+        page_style="instructor.css",
+        scenarios=scenarios,
+        active_tab=active_tab,
+        edit_scenario=edit_scenario,
+    )
+
+
+@app.route("/instructor/scenarios/create", methods=["GET", "POST"])
+@login_required
+@role_required("instructor")
+def instructor_create_scenario():
+    user = db.session.get(User, session["user_id"])
+    context = build_scenario_form_context()
+
+    if request.method == "POST":
+        action = request.form.get("action", "generate")
+        title = request.form.get("title", "").strip()
+        summary = request.form.get("summary", "").strip()
+        description = request.form.get("description", "").strip()
+        scenario_name = request.form.get("scenario", "").strip()
+
+        context.update({
+            "title_value": title,
+            "summary_value": summary,
+            "description": description,
+            "scenario": scenario_name,
+            "form_data": {
+                "title": title,
+                "summary": summary,
+                "description": description,
+            }
+        })
+
+        if action == "generate":
+            preview_dir = f"scenario_artifacts/_preview_{user.id}"
+            preview = build_testbed_context(
+                description=description,
+                scenario=scenario_name,
+                base_dir=preview_dir,
+                persist_files=True,
+            )
+            context.update(preview)
+            return render_template(
+                "instructor_create_scenario.html",
+                page_style="testbed_creator.css",
+                **context
+            )
+
+        if action == "save":
+            if not title or not description:
+                context["save_error"] = "Title and scenario description are required."
+                return render_template(
+                    "instructor_create_scenario.html",
+                    page_style="testbed_creator.css",
+                    **context
+                )
+
+            validation_errors = validate_description(description)
+            if validation_errors:
+                context["save_error"] = "Please fix the validation errors below."
+                context["validation_errors"] = validation_errors
+                preview = build_testbed_context(
+                    description=description,
+                    scenario=scenario_name,
+                    base_dir=f"scenario_artifacts/_preview_{user.id}",
+                    persist_files=True,
+                )
+                context.update(preview)
+                return render_template(
+                    "instructor_create_scenario.html",
+                    page_style="testbed_creator.css",
+                    **context
+                )
+
+            slug = generate_unique_slug(title)
+            artifact_dir = f"scenario_artifacts/{slug}"
+
+            bundle = build_scenario_bundle(
+                description=description,
+                scenario=scenario_name,
+                base_dir=artifact_dir,
+                reset_dir_first=True,
+            )
+
+            if not bundle.get("ok"):
+                context["save_error"] = "Scenario generation failed."
+                context["validation_errors"] = bundle.get("errors", ["Unknown generation error."])
+                preview = build_testbed_context(
+                    description=description,
+                    scenario=scenario_name,
+                    base_dir=f"scenario_artifacts/_preview_{user.id}",
+                    persist_files=True,
+                )
+                context.update(preview)
+                return render_template(
+                    "instructor_create_scenario.html",
+                    page_style="testbed_creator.css",
+                    **context
+                )
+
+            scenario = Scenario(
+                title=title,
+                slug=slug,
+                summary=summary or None,
+                description=description,
+                country=bundle["topology"].get("country", "US"),
+                topology_json=json.dumps(bundle["topology"], indent=2),
+                manifest_json=json.dumps(bundle["manifest"], indent=2),
+                generated_script=bundle["generated_script"],
+                artifact_dir=bundle["artifact_dir"],
+                created_by_id=user.id,
+            )
+            db.session.add(scenario)
+            db.session.commit()
+
+            return redirect(url_for("instructor_scenarios", tab="view"))
+
+    return render_template(
+        "instructor_create_scenario.html",
+        page_style="testbed_creator.css",
+        **context
+    )
+
+
+@app.route("/instructor/scenarios/<int:scenario_id>/edit", methods=["GET", "POST"])
+@login_required
+@role_required("instructor")
+def instructor_edit_scenario(scenario_id):
+    user = db.session.get(User, session["user_id"])
+    scenario = Scenario.query.filter_by(id=scenario_id, created_by_id=user.id).first_or_404()
+
+    context = build_scenario_form_context()
+    context.update({
+        "title_value": scenario.title,
+        "summary_value": scenario.summary or "",
+        "description": scenario.description,
+        "scenario": "",
+        "editing_scenario": scenario,
+        "show_step2": True,
+    })
+
+    if request.method == "POST":
+        action = request.form.get("action", "generate")
+        title = request.form.get("title", "").strip()
+        summary = request.form.get("summary", "").strip()
+        description = request.form.get("description", "").strip()
+        scenario_name = request.form.get("scenario", "").strip()
+
+        context.update({
+            "title_value": title,
+            "summary_value": summary,
+            "description": description,
+            "scenario": scenario_name,
+            "form_data": {
+                "title": title,
+                "summary": summary,
+                "description": description,
+            }
+        })
+
+        if action == "generate":
+            preview_dir = f"scenario_artifacts/_preview_edit_{user.id}_{scenario.id}"
+            preview = build_testbed_context(
+                description=description,
+                scenario=scenario_name,
+                base_dir=preview_dir,
+                persist_files=True,
+            )
+            context.update(preview)
+            context["editing_scenario"] = scenario
+            return render_template(
+                "instructor_create_scenario.html",
+                page_style="testbed_creator.css",
+                **context
+            )
+
+        if action == "save":
+            if not title or not description:
+                context["save_error"] = "Title and scenario description are required."
+                context["editing_scenario"] = scenario
+                return render_template(
+                    "instructor_create_scenario.html",
+                    page_style="testbed_creator.css",
+                    **context
+                )
+
+            validation_errors = validate_description(description)
+            if validation_errors:
+                context["save_error"] = "Please fix the validation errors below."
+                context["validation_errors"] = validation_errors
+                preview = build_testbed_context(
+                    description=description,
+                    scenario=scenario_name,
+                    base_dir=f"scenario_artifacts/_preview_edit_{user.id}_{scenario.id}",
+                    persist_files=True,
+                )
+                context.update(preview)
+                context["editing_scenario"] = scenario
+                return render_template(
+                    "instructor_create_scenario.html",
+                    page_style="testbed_creator.css",
+                    **context
+                )
+
+            slug = scenario.slug
+            if scenario.title != title:
+                slug = generate_unique_slug(title)
+
+            old_artifact_dir = scenario.artifact_dir
+            artifact_dir = f"scenario_artifacts/{slug}"
+
+            bundle = build_scenario_bundle(
+                description=description,
+                scenario=scenario_name,
+                base_dir=artifact_dir,
+                reset_dir_first=True,
+            )
+
+            if not bundle.get("ok"):
+                context["save_error"] = "Scenario generation failed."
+                context["validation_errors"] = bundle.get("errors", ["Unknown generation error."])
+                preview = build_testbed_context(
+                    description=description,
+                    scenario=scenario_name,
+                    base_dir=f"scenario_artifacts/_preview_edit_{user.id}_{scenario.id}",
+                    persist_files=True,
+                )
+                context.update(preview)
+                context["editing_scenario"] = scenario
+                return render_template(
+                    "instructor_create_scenario.html",
+                    page_style="testbed_creator.css",
+                    **context
+                )
+
+            scenario.title = title
+            scenario.slug = slug
+            scenario.summary = summary or None
+            scenario.description = description
+            scenario.country = bundle["topology"].get("country", "US")
+            scenario.topology_json = json.dumps(bundle["topology"], indent=2)
+            scenario.manifest_json = json.dumps(bundle["manifest"], indent=2)
+            scenario.generated_script = bundle["generated_script"]
+            scenario.artifact_dir = bundle["artifact_dir"]
+            scenario.updated_at = datetime.utcnow()
+
+            db.session.commit()
+
+            if old_artifact_dir and old_artifact_dir != artifact_dir:
+                safe_remove_artifact_dir(old_artifact_dir)
+
+            return redirect(url_for("instructor_scenarios", tab="view"))
+
+    preview = build_testbed_context(
+        description=scenario.description,
+        scenario="",
+        base_dir=f"scenario_artifacts/_preview_edit_{user.id}_{scenario.id}",
+        persist_files=True,
+    )
+    context.update(preview)
+    context["editing_scenario"] = scenario
+
+    return render_template(
+        "instructor_create_scenario.html",
+        page_style="testbed_creator.css",
+        **context
+    )
+
+
+@app.route("/instructor/scenarios/<int:scenario_id>/delete", methods=["POST"])
+@login_required
+@role_required("instructor")
+def instructor_delete_scenario(scenario_id):
+    user = db.session.get(User, session["user_id"])
+    scenario = Scenario.query.filter_by(id=scenario_id, created_by_id=user.id).first_or_404()
+
+    artifact_dir = scenario.artifact_dir
+    db.session.delete(scenario)
+    db.session.commit()
+
+    safe_remove_artifact_dir(artifact_dir)
+
+    return redirect(url_for("instructor_scenarios", tab="delete"))
 
 
 @app.route("/instructor/performance")
@@ -637,7 +966,8 @@ def signup_learner():
         return redirect(url_for("login_learner"))
 
     return render_template("signup_learner.html", page_style="login.css", title="Learner Signup – Wi-Fi Labs")
-    
+
+
 # ====================================================
 #                LEARNER ROUTES
 # ====================================================
@@ -687,7 +1017,6 @@ def learner_help():
 @login_required
 @role_required("admin")
 def admin_dashboard():
-
     total_users = User.query.filter(User.role != "admin").count()
     instructors = User.query.filter_by(role="instructor").count()
     learners = User.query.filter_by(role="learner").count()
@@ -714,6 +1043,7 @@ def admin_dashboard():
         cves=cves
     )
 
+
 @app.route("/admin/users")
 @login_required
 @role_required("admin")
@@ -726,15 +1056,15 @@ def admin_users():
 @login_required
 @role_required("admin")
 def admin_scenarios():
-    # Placeholder page for now
     return render_template("admin_scenarios.html", page_style="admin.css")
+
 
 @app.route("/admin/assets")
 @login_required
 @role_required("admin")
 def admin_assets():
-    # Placeholder page for assets management
     return render_template("admin_assets.html", page_style="admin.css")
+
 
 @app.route("/admin/reset-password/<int:user_id>", methods=["POST"])
 @login_required
@@ -742,7 +1072,6 @@ def admin_assets():
 def admin_reset_password(user_id):
     user = User.query.get_or_404(user_id)
 
-    # Block admin accounts from appearing/being reset via this page
     if user.role == "admin":
         users = User.query.filter(User.role != "admin").all()
         return render_template(
@@ -786,7 +1115,6 @@ def admin_reset_password(user_id):
 def admin_delete_user(user_id):
     user = User.query.get_or_404(user_id)
 
-    # Prevent deleting admin accounts
     if user.role == "admin":
         users = User.query.filter(User.role != "admin").all()
         return render_template(
@@ -796,7 +1124,6 @@ def admin_delete_user(user_id):
             error="Admin accounts cannot be deleted."
         )
 
-    # Prevent deleting yourself
     if user.id == session.get("user_id"):
         users = User.query.filter(User.role != "admin").all()
         return render_template(
@@ -833,7 +1160,6 @@ def profile_update():
     username = request.form.get("username", "").strip()
     bio = request.form.get("bio", "").strip()
 
-    # Username validation
     if not is_valid_username(username):
         return render_template(
             "profile.html",
@@ -842,7 +1168,6 @@ def profile_update():
             error="Username must be 3–20 characters and contain only letters, numbers, or underscores."
         )
 
-    # Uniqueness check (exclude self)
     existing = User.query.filter(User.username == username, User.id != user.id).first()
     if existing:
         return render_template(
@@ -852,7 +1177,6 @@ def profile_update():
             error="That username is already taken."
         )
 
-    # Bio limit
     if len(bio) > 280:
         return render_template(
             "profile.html",
@@ -951,7 +1275,6 @@ if __name__ == "__main__":
     with app.app_context():
         db.create_all()
 
-        # Create default admin if not exists
         if not User.query.filter_by(role="admin").first():
             admin = User(email="admin@test.com", role="admin")
             admin.set_password("admin")

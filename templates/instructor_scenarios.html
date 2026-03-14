@@ -1,7 +1,218 @@
 {% extends "base.html" %}
 {% block content %}
+<section class="dashboard-section">
+    <div class="page-header scenarios-header">
+        <div>
+            <h1>Scenarios</h1>
+            <p>Manage your Wi-Fi lab scenarios from one place.</p>
+        </div>
+    </div>
 
-<h2 class="page-title">Scenarios</h2>
-<p>Overview of your scenarios and learner activity.</p>
+    <div class="cyber-card scenarios-hub">
+        <div class="scenario-subtabs">
+            <a
+                href="{{ url_for('instructor_scenarios', tab='view') }}"
+                class="scenario-subtab {% if active_tab == 'view' %}active{% endif %}"
+            >
+                View
+            </a>
+            <a
+                href="{{ url_for('instructor_scenarios', tab='create') }}"
+                class="scenario-subtab {% if active_tab == 'create' %}active{% endif %}"
+            >
+                Create
+            </a>
+            <a
+                href="{{ url_for('instructor_scenarios', tab='update') }}"
+                class="scenario-subtab {% if active_tab == 'update' %}active{% endif %}"
+            >
+                Update
+            </a>
+            <a
+                href="{{ url_for('instructor_scenarios', tab='delete') }}"
+                class="scenario-subtab {% if active_tab == 'delete' %}active{% endif %}"
+            >
+                Delete
+            </a>
+        </div>
 
+        {% if active_tab == 'view' %}
+            <div class="scenario-panel">
+                <div class="panel-heading">
+                    <div>
+                        <h2>View Scenarios</h2>
+                        <p>Browse all scenarios you have created.</p>
+                    </div>
+                    <a href="{{ url_for('instructor_create_scenario') }}" class="btn-primary">New Scenario</a>
+                </div>
+
+                {% if scenarios %}
+                    <div class="scenario-grid">
+                        {% for scenario in scenarios %}
+                            <article class="cyber-card scenario-card">
+                                <div class="scenario-card-top">
+                                    <div>
+                                        <h3>{{ scenario.title }}</h3>
+                                        {% if scenario.summary %}
+                                            <p>{{ scenario.summary }}</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+                                <div class="scenario-meta">
+                                    <span>Country: {{ scenario.country }}</span>
+                                    <span>Slug: {{ scenario.slug }}</span>
+                                    <span>
+                                        Created:
+                                        {{ scenario.created_at.strftime('%Y-%m-%d %H:%M') if scenario.created_at else '—' }}
+                                    </span>
+                                </div>
+
+                                <div class="scenario-actions">
+                                    <a href="{{ url_for('instructor_edit_scenario', scenario_id=scenario.id) }}" class="btn-primary">
+                                        Open / Edit
+                                    </a>
+                                </div>
+
+                                <details>
+                                    <summary>Structured description</summary>
+                                    <pre class="scenario-pre">{{ scenario.description }}</pre>
+                                </details>
+
+                                <details>
+                                    <summary>Generated shell script</summary>
+                                    <pre class="scenario-pre scenario-pre-scroll">{{ scenario.generated_script or '' }}</pre>
+                                </details>
+                            </article>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="cyber-card empty-state-card">
+                        <h3>No scenarios yet</h3>
+                        <p>Create your first embedded testbed scenario.</p>
+                    </div>
+                {% endif %}
+            </div>
+        {% endif %}
+
+        {% if active_tab == 'create' %}
+            <div class="scenario-panel">
+                <div class="panel-heading">
+                    <div>
+                        <h2>Create Scenario</h2>
+                        <p>Launch the generator and save a new Wi-Fi lab scenario.</p>
+                    </div>
+                </div>
+
+                <div class="cyber-card action-card">
+                    <h3>Scenario Generator</h3>
+                    <p>
+                        Use the testbed generator to build a topology, preview configs,
+                        and save it as a reusable scenario.
+                    </p>
+                    <a href="{{ url_for('instructor_create_scenario') }}" class="btn-primary">Open Creator</a>
+                </div>
+            </div>
+        {% endif %}
+
+        {% if active_tab == 'update' %}
+            <div class="scenario-panel">
+                <div class="panel-heading">
+                    <div>
+                        <h2>Update Scenarios</h2>
+                        <p>Select a scenario to modify and regenerate.</p>
+                    </div>
+                </div>
+
+                {% if scenarios %}
+                    <div class="scenario-list">
+                        {% for scenario in scenarios %}
+                            <article class="cyber-card scenario-list-card">
+                                <div class="scenario-list-main">
+                                    <div>
+                                        <h3>{{ scenario.title }}</h3>
+                                        {% if scenario.summary %}
+                                            <p>{{ scenario.summary }}</p>
+                                        {% endif %}
+                                        <div class="scenario-meta">
+                                            <span>Country: {{ scenario.country }}</span>
+                                            <span>Slug: {{ scenario.slug }}</span>
+                                            <span>
+                                                Updated:
+                                                {{ scenario.updated_at.strftime('%Y-%m-%d %H:%M') if scenario.updated_at else '—' }}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <div class="scenario-actions">
+                                        <a href="{{ url_for('instructor_edit_scenario', scenario_id=scenario.id) }}" class="btn-primary">
+                                            Edit Scenario
+                                        </a>
+                                    </div>
+                                </div>
+                            </article>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="cyber-card empty-state-card">
+                        <h3>No scenarios available</h3>
+                        <p>You need at least one scenario before you can update it.</p>
+                    </div>
+                {% endif %}
+            </div>
+        {% endif %}
+
+        {% if active_tab == 'delete' %}
+            <div class="scenario-panel">
+                <div class="panel-heading">
+                    <div>
+                        <h2>Delete Scenarios</h2>
+                        <p>Remove scenarios you no longer need.</p>
+                    </div>
+                </div>
+
+                {% if scenarios %}
+                    <div class="scenario-list">
+                        {% for scenario in scenarios %}
+                            <article class="cyber-card scenario-list-card danger-card">
+                                <div class="scenario-list-main">
+                                    <div>
+                                        <h3>{{ scenario.title }}</h3>
+                                        {% if scenario.summary %}
+                                            <p>{{ scenario.summary }}</p>
+                                        {% endif %}
+                                        <div class="scenario-meta">
+                                            <span>Country: {{ scenario.country }}</span>
+                                            <span>Slug: {{ scenario.slug }}</span>
+                                            <span>
+                                                Created:
+                                                {{ scenario.created_at.strftime('%Y-%m-%d %H:%M') if scenario.created_at else '—' }}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <div class="scenario-actions">
+                                        <form
+                                            method="POST"
+                                            action="{{ url_for('instructor_delete_scenario', scenario_id=scenario.id) }}"
+                                            onsubmit="return confirm('Delete scenario {{ scenario.title|e }}? This cannot be undone.');"
+                                        >
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn-danger">Delete</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </article>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="cyber-card empty-state-card">
+                        <h3>No scenarios available</h3>
+                        <p>There are no scenarios to delete.</p>
+                    </div>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+</section>
 {% endblock %}
