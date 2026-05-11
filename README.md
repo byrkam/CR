@@ -67,24 +67,88 @@ Learners gain access to those scenarios along with a live Wi-Fi security news fe
 ## Architecture
 
 ```
-Wi-Fi BlackBeacon
-├── app1.py                  # Flask application: routes, auth, session management
-├── models.py                # SQLAlchemy models: User, Scenario
-├── scenario_engine.py       # Core engine: parse → generate → persist testbed artifacts
-├── templates/               # Jinja2 HTML templates (per-role dashboards, forms)
+CR/  (repository root)
+├── app1.py                        # Flask application: routes, auth, session management
+├── models.py                      # SQLAlchemy models: User, Scenario
+├── scenario_engine.py             # Core engine: parse → generate → persist testbed artifacts
+├── generated_script.sh            # Example/sample generated orchestration script
+├── .gitignore
+│
+├── configs/                       # Sample generated testbed configs (example scenario)
+│   ├── hostapd_wlan0.conf         # Access Point configuration (hostapd)
+│   ├── dnsmasq.conf               # DHCP server configuration
+│   ├── wpa_supplicant_wlan1.conf  # Station 1 wpa_supplicant config
+│   ├── wpa_supplicant_wlan2.conf  # Station 2 wpa_supplicant config
+│   ├── wpa_supplicant_wlan3.conf  # Station 3 wpa_supplicant config
+│   ├── wpa_supplicant_wlan4.conf  # Station 4 wpa_supplicant config
+│   └── wpa_supplicant_wlan5.conf  # Station 5 wpa_supplicant config
+│
+├── scripts/                       # Sample generated testbed scripts (example scenario)
+│   ├── ap_wlan0.sh                # AP interface setup & hostapd launch script
+│   ├── sta_wlan1.sh               # Station 1 wpa_supplicant + DHCP script
+│   ├── sta_wlan2.sh               # Station 2 wpa_supplicant + DHCP script
+│   ├── sta_wlan3.sh               # Station 3 wpa_supplicant + DHCP script
+│   ├── sta_wlan4.sh               # Station 4 wpa_supplicant + DHCP script
+│   ├── sta_wlan5.sh               # Station 5 wpa_supplicant + DHCP script
+│   ├── manifest.json              # Interface-to-namespace mapping
+│   └── wlan-tools.sh              # Diagnostic & management utility
+│
+├── scenario_artifacts/            # Runtime: generated artifacts per saved scenario
+│   └── <scenario-slug>/           # One directory per scenario (auto-created)
+│       ├── configs/               # hostapd, wpa_supplicant, dnsmasq configs
+│       ├── scripts/               # Per-interface scripts, manifest.json, wlan-tools.sh
+│       └── generated_script.sh   # Master orchestration script
+│
 ├── static/
-│   ├── css/                 # Per-role stylesheets (base, admin, instructor, learner, etc.)
-│   ├── icons/               # Topology node icons (ap.png, sta.png, radius.png)
-│   └── js/
-│       ├── topology.js      # vis.js network topology renderer
-│       ├── password_validation.js  # Client-side password strength checker
-│       └── news_widget.html # Wi-Fi news/CVE widget partial
-├── scenario_artifacts/      # Generated testbed artifacts (per scenario slug)
-│   └── <slug>/
-│       ├── configs/         # hostapd & wpa_supplicant configs, dnsmasq.conf
-│       ├── scripts/         # Per-interface shell scripts, manifest.json, wlan-tools.sh
-│       └── generated_script.sh
-└── database.db              # SQLite database (auto-created on first run)
+│   ├── css/                       # Per-role stylesheets
+│   │   ├── base.css
+│   │   ├── admin.css
+│   │   ├── instructor.css
+│   │   ├── learner.css
+│   │   ├── login.css
+│   │   ├── home.css
+│   │   ├── form.css
+│   │   ├── profile.css
+│   │   └── testbed_creator.css
+│   ├── icons/                     # Topology node icons
+│   │   ├── ap.png
+│   │   ├── sta.png
+│   │   ├── radius.png
+│   │   └── wifi-logo.png
+│   └── js/                        # Client-side scripts
+│       ├── topology.js            # vis.js network topology renderer
+│       ├── password_validation.js # Client-side password strength checker
+│       └── a                      # (placeholder / WIP file)
+│
+├── templates/                     # Jinja2 HTML templates
+│   ├── partials/                  # Reusable template fragments
+│   ├── base.html                  # Base layout template
+│   ├── home.html
+│   ├── login.html
+│   ├── login_instructor.html
+│   ├── login_learner.html
+│   ├── signup_instructor.html
+│   ├── signup_learner.html
+│   ├── profile.html
+│   ├── testbed.html
+│   ├── admin_dashboard.html
+│   ├── admin_users.html
+│   ├── admin_scenarios.html
+│   ├── admin_assets.html
+│   ├── instructor_dashboard.html
+│   ├── instructor_scenarios.html
+│   ├── instructor_create_scenario.html
+│   ├── instructor_edit_scenario.html
+│   ├── instructor_learners.html
+│   ├── instructor_performance.html
+│   ├── instructor_reports.html
+│   ├── learner_dashboard.html
+│   ├── learner_scenarios.html
+│   ├── learner_submissions.html
+│   ├── learner_resources.html
+│   └── learner_help.html
+│
+└── database.db                    # SQLite database (auto-created on first run, gitignored)
 ```
 
 ---
@@ -125,8 +189,8 @@ sudo apt-get install -y freeradius freeradius-utils
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/your-username/wifi-blackbeacon.git
-cd wifi-blackbeacon
+git clone https://github.com/byrkam/CR.git
+cd CR
 
 # 2. Create and activate a virtual environment
 python3 -m venv venv
